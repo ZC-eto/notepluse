@@ -11,6 +11,14 @@ import EditorView from './views/EditorView.vue'
 import TodoView from './views/TodoView.vue'
 import GanttView from './views/GanttView.vue'
 import CalendarView from './views/CalendarView.vue'
+import MiniStickyView from './views/MiniStickyView.vue'
+
+const isMiniMode =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'mini'
+
+if (isMiniMode) {
+  document.documentElement.classList.add('mini-mode')
+}
 
 const ws = useWorkspace()
 provide('workspace', ws)
@@ -225,6 +233,11 @@ function onKeydown(ev: KeyboardEvent) {
 }
 
 onMounted(async () => {
+  if (isMiniMode) {
+    // 小窗只需要任务投影，不占主工作台高度
+    await ws.refreshNotes()
+    return
+  }
   applyPluginHeight()
   await ws.refreshNotes()
   if ((ws as any).defaultView) ws.setView((ws as any).defaultView)
@@ -252,7 +265,13 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app-shell" :data-view="ws.view" :data-library="libraryOpen ? 'open' : 'closed'">
+  <MiniStickyView v-if="isMiniMode" />
+  <div
+    v-else
+    class="app-shell"
+    :data-view="ws.view"
+    :data-library="libraryOpen ? 'open' : 'closed'"
+  >
     <nav class="work-rail" aria-label="工作台导航">
       <div class="rail-signature" title="墨线工作台" aria-label="墨线工作台">
         <span class="rail-mark" aria-hidden="true">墨</span>

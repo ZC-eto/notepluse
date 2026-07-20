@@ -183,16 +183,20 @@ function demoInit() {
     DEFAULT_FOLDERS.map((name) => ({ name, path: name, kind: folderKindOf(name) }))
   )
   if (!notes.value.length) {
-    const body = demoContent()
-    const personalPath = 'demo://个人/购物清单'
-    const personalBody = `# 购物清单
-
-- [ ] 牛奶 @id(demo-milk)
-- [ ] 面包 @id(demo-bread)
-- [x] 鸡蛋 @id(demo-egg)
-`
+    const date = todayIso()
+    const body = demoContent(date)
+    const personalPath = 'demo://个人/购物与琐事'
+    const personalBody = samplePersonalBody()
+    const todayPath = `demo://今日待办/今日计划-${date}`
+    const d = new Date(`${date}T12:00:00`)
+    const add = (n: number) => {
+      const x = new Date(d)
+      x.setDate(x.getDate() + n)
+      return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+    }
     demoStore.set(DEMO_PLAN_PATH, body)
     demoStore.set(personalPath, personalBody)
+    demoStore.set(todayPath, todayPlanBodyRich(date, add(-1), add(2)))
     notes.value = [
       {
         name: '快速开始.md',
@@ -203,7 +207,15 @@ function demoInit() {
         kind: 'note',
       },
       {
-        name: '购物清单.md',
+        name: `今日计划-${date}.md`,
+        path: todayPath,
+        mtime: Date.now() - 500,
+        size: 1,
+        folder: '今日待办',
+        kind: 'todo',
+      },
+      {
+        name: '购物与琐事.md',
         path: personalPath,
         mtime: Date.now() - 1000,
         size: 1,
@@ -293,26 +305,99 @@ export function useWorkspace() {
 
   async function ensureDemoSamples() {
     try {
-      const hasSample = notes.value.some(
-        (n) =>
-          n.name === '示例-待办甘特.md' ||
-          n.path.endsWith('/示例-待办甘特.md') ||
-          n.path.endsWith('\\示例-待办甘特.md')
-      )
-      if (hasSample) {
-        status.value = '示例笔记已存在'
-        return
+      const date = todayIso()
+      const d = new Date(`${date}T12:00:00`)
+      const addDays = (n: number) => {
+        const x = new Date(d)
+        x.setDate(x.getDate() + n)
+        const y = x.getFullYear()
+        const m = String(x.getMonth() + 1).padStart(2, '0')
+        const day = String(x.getDate()).padStart(2, '0')
+        return `${y}-${m}-${day}`
       }
-      // 先确保多级目录
+      const yest = addDays(-1)
+      const in2 = addDays(2)
+      const in4 = addDays(4)
+      const in7 = addDays(7)
+      const in14 = addDays(14)
+
+      // 多级目录
       if (window.services?.createFolder) {
-        try {
-          ;(window.services as any).createFolder('示例', '工作')
-        } catch {
-          /* ignore */
+        for (const [name, parent] of [
+          ['示例', '工作'],
+          ['本周', '今日待办'],
+        ] as const) {
+          try {
+            ;(window.services as any).createFolder(name, parent)
+          } catch {
+            /* ignore */
+          }
         }
       }
-      await createNote('工作/示例', { title: '示例-待办甘特', body: demoContent() })
-      status.value = '已创建示例笔记'
+
+      const seeds: Array<{ folder: string; title: string; body: string; match: (n: NoteMeta) => boolean }> = [
+        {
+          folder: '工作',
+          title: '快速开始',
+          body: demoContent(date),
+          match: (n) => n.name === '快速开始.md' || n.path.endsWith('/快速开始.md') || n.path.endsWith('\\快速开始.md'),
+        },
+        {
+          folder: '工作/示例',
+          title: '示例-待办甘特',
+          body: sampleProjectBody(date, yest, in2, in4, in7, in14),
+          match: (n) => n.name === '示例-待办甘特.md',
+        },
+        {
+          folder: '今日待办',
+          title: `今日计划-${date}`,
+          body: todayPlanBodyRich(date, yest, in2),
+          match: (n) => n.folder === '今日待办' && n.name.replace(/\.md$/i, '') === `今日计划-${date}`,
+        },
+        {
+          folder: '个人',
+          title: '购物与琐事',
+          body: samplePersonalBody(),
+          match: (n) => n.name === '购物与琐事.md',
+        },
+        {
+          folder: '长期待办',
+          title: '季度目标',
+          body: sampleLongBody(date, in14, addDays(45)),
+          match: (n) => n.name === '季度目标.md',
+        },
+        {
+          folder: '记录',
+          title: `灵感-${date}`,
+          body: `# 灵感-${date}\n\n日期：${date}\n\n- 便签小窗应像磨砂便签，而不是缩小的主窗口\n- 任务只从显式 Task Block 投影\n`,
+          match: (n) => n.folder === '记录' && n.name.startsWith('灵感-'),
+        },
+      ]
+
+      let created = 0
+      let skipped = 0
+      for (const seed of seeds) {
+        if (notes.value.some(seed.match)) {
+          skipped += 1
+          continue
+        }
+        await createNote(seed.folder, { title: seed.title, body: seed.body })
+        created += 1
+      }
+      await refreshNotes()
+      if (created === 0) {
+        status.value = skipped ? `示例已齐全（${skipped} 篇）` : '示例笔记已存在'
+      } else {
+        status.value = `已创建 ${created} 篇示例` + (skipped ? `（跳过 ${skipped}）` : '')
+      }
+      // 打开今日计划，方便立刻看到待办投影
+      const todayNote = notes.value.find(
+        (n) => n.folder === '今日待办' && n.name.replace(/\.md$/i, '') === `今日计划-${date}`
+      )
+      if (todayNote) {
+        await openNote(todayNote.path)
+        setView('todo')
+      }
     } catch (e) {
       console.warn(e)
       status.value = '创建示例失败'
@@ -325,35 +410,64 @@ export function useWorkspace() {
         status.value = '当前宿主不支持桌面小窗'
         return
       }
-      if (miniWindowRef && typeof miniWindowRef.focus === 'function') {
+      if (miniWindowRef) {
         try {
-          miniWindowRef.focus()
-          return
+          if (typeof miniWindowRef.isDestroyed === 'function' && miniWindowRef.isDestroyed()) {
+            miniWindowRef = null
+          } else if (typeof miniWindowRef.focus === 'function') {
+            miniWindowRef.focus()
+            if (typeof miniWindowRef.show === 'function') miniWindowRef.show()
+            if (typeof miniWindowRef.moveTop === 'function') miniWindowRef.moveTop()
+            return
+          }
         } catch {
           miniWindowRef = null
         }
       }
-      // 相对当前插件页面打开同一入口，便于操作而不只是展示
-      const url = './index.html?mode=mini'
+      // 便签：无标题栏、透明磨砂、置顶、不占任务栏
+      const url = 'index.html?mode=mini'
       miniWindowRef = window.ztools.createBrowserWindow(
         url,
         {
-          width: 420,
-          height: 640,
+          width: 300,
+          height: 420,
+          minWidth: 240,
+          minHeight: 280,
           resizable: true,
-          title: '墨线 · 小窗',
+          maximizable: false,
+          minimizable: false,
+          fullscreenable: false,
+          title: '今日便签',
+          frame: false,
+          transparent: true,
+          hasShadow: false,
+          backgroundColor: '#00000000',
+          skipTaskbar: true,
           alwayOnTop: true,
+          alwaysOnTop: true,
           webPreferences: {
             zoomFactor: 1,
           },
-        },
+        } as any,
         () => {
-          /* ready */
+          try {
+            if (miniWindowRef && typeof miniWindowRef.setAlwaysOnTop === 'function') {
+              miniWindowRef.setAlwaysOnTop(true)
+            }
+            if (miniWindowRef && typeof miniWindowRef.setSkipTaskbar === 'function') {
+              miniWindowRef.setSkipTaskbar(true)
+            }
+            if (miniWindowRef && typeof miniWindowRef.setBackgroundColor === 'function') {
+              miniWindowRef.setBackgroundColor('#00000000')
+            }
+          } catch {
+            /* ignore host quirks */
+          }
         }
       )
       miniWindowEnabled.value = true
       persistUiPrefs()
-      status.value = '已打开桌面小窗'
+      status.value = '已打开桌面便签'
     } catch (e) {
       console.warn('[md-workspace] openMiniWindow failed', e)
       status.value = '打开小窗失败'
@@ -1391,7 +1505,16 @@ export function useWorkspace() {
   })
 }
 
-function demoContent() {
+function demoContent(baseDate?: string) {
+  const date = baseDate || todayIso()
+  const d = new Date(`${date}T12:00:00`)
+  const add = (n: number) => {
+    const x = new Date(d)
+    x.setDate(x.getDate() + n)
+    return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+  }
+  const end = add(4)
+  const due = add(2)
   return `# 快速开始
 
 这里可以写任意 Markdown。普通的 \`- [ ]\`、代码块和会议记录不会自动变成项目任务；只有显式 Task Block 中的条目会同步到待办、日历和甘特视图。
@@ -1402,14 +1525,98 @@ function demoContent() {
 
 ## 示例任务
 
-- [ ] 写产品需求 @id(requirements) @start(2026-07-20) @end(2026-07-24) @priority(high) #工作
-  - [ ] 整理评审材料 @id(review-kit) @due(2026-07-22) #协作
-- [ ] 发布里程碑 @id(release) @type(milestone) @date(2026-07-24) @color(green)
+- [ ] 写产品需求 @id(requirements) @start(${date}) @end(${end}) @priority(high) #工作
+  - [ ] 整理评审材料 @id(review-kit) @due(${due}) #协作
+- [ ] 发布里程碑 @id(release) @type(milestone) @date(${end}) @color(green)
 
 <!-- /mdw:tasks -->
 
 ## 记录
 
 任务的来源、层级、日期和颜色均保留在 Markdown 真源中。需要新建任务时，请先选择目标笔记和 Task Block。
+`
+}
+
+function todayPlanBodyRich(date: string, yest: string, in2: string) {
+  return `# 日程页 — ${date}
+
+早上路径示例：收件箱 / 今日 / 即将到来 / 全部 会从各笔记的 Task Block 聚合。
+
+<!-- mdw:tasks id="daily-${date}" name="${date} 日程" color="blue" -->
+
+## 今日焦点
+
+- [ ] 完成一项重要工作 @id(focus-${date}) @date(${date}) @priority(high) #工作
+- [ ] 回复客户邮件 @id(mail-${date}) @due(${date}) #琐事
+- [ ] 站会纪要 @id(standup-${date}) @date(${date}) #协作
+
+## 逾期与即将
+
+- [ ] 补交周报 @id(overdue-report) @due(${yest}) @priority(urgent) #工作
+- [ ] 预约牙医 @id(dentist) @due(${in2}) #个人
+
+## 未排期（进收件箱）
+
+- [ ] 整理下载文件夹 @id(inbox-downloads) #琐事
+- [ ] 想一个周末去处 @id(inbox-weekend) #个人
+
+<!-- /mdw:tasks -->
+
+## 记录
+
+`
+}
+
+function sampleProjectBody(date: string, yest: string, in2: string, in4: string, in7: string, in14: string) {
+  return `# 示例 · 产品迭代
+
+跨日任务会出现在甘特；单日 / 截止日出现在日历与待办。
+
+<!-- mdw:tasks id="sprint-demo" name="迭代示例" color="orange" -->
+
+## 进行中
+
+- [ ] 设计便签小窗 @id(mini-sticky) @start(${yest}) @end(${in4}) @priority(high) #工作 @color(violet)
+- [ ] 完善示例数据 @id(seed-samples) @start(${date}) @end(${in2}) #工作
+- [ ] 写验收清单 @id(qa-list) @due(${in2}) @priority(medium) #协作
+
+## 里程碑
+
+- [ ] 内测发布 @id(beta) @type(milestone) @date(${in7}) @color(green)
+- [ ] 正式上线 @id(ga) @type(milestone) @date(${in14}) @color(blue)
+
+## 收件箱条目
+
+- [ ] 调研 Windows 亚克力效果 @id(acrylic-research) #工作
+
+<!-- /mdw:tasks -->
+`
+}
+
+function samplePersonalBody() {
+  return `# 购物与琐事
+
+<!-- mdw:tasks id="personal-errands" name="个人琐事" color="green" -->
+
+- [ ] 买牛奶 @id(buy-milk) #个人
+- [ ] 交电费 @id(pay-power) @priority(low) #琐事
+- [x] 取快递 @id(parcel-done) #个人
+
+<!-- /mdw:tasks -->
+`
+}
+
+function sampleLongBody(date: string, mid: string, far: string) {
+  return `# 季度目标
+
+长期跨日条适合放在「长期待办」夹，甘特上会拉得很长。
+
+<!-- mdw:tasks id="quarter-goals" name="季度目标" color="blue" -->
+
+- [ ] 完成知识库迁移 @id(kb-migrate) @start(${date}) @end(${far}) @priority(medium) #工作
+- [ ] 健身计划坚持 @id(fitness) @start(${date}) @end(${mid}) #个人 @color(green)
+- [ ] 季度回顾 @id(q-review) @type(milestone) @date(${far}) @color(orange)
+
+<!-- /mdw:tasks -->
 `
 }

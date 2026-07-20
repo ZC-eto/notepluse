@@ -170,26 +170,26 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           <section class="settings-block">
             <h3 class="settings-block-title">
               示例数据
-              <HelpTip text="生成一篇含任务组的示例笔记，方便查看待办/甘特/日历效果。不会覆盖已有文件。" label="示例说明" />
+              <HelpTip text="生成多篇示例：今日计划、工作迭代、个人琐事、长期目标与灵感记录。已有同名文件会跳过，不会覆盖。" label="示例说明" />
             </h3>
             <div class="settings-actions">
-              <button type="button" class="btn-solid sm" @click="seedSamples">创建示例笔记</button>
+              <button type="button" class="btn-solid sm" @click="seedSamples">填充示例数据</button>
               <button type="button" class="btn-ghost sm" @click="ws.openSampleNote()">打开快速开始</button>
             </div>
           </section>
 
           <section class="settings-block">
             <h3 class="settings-block-title">
-              桌面小窗
-              <HelpTip text="使用宿主 createBrowserWindow 打开可操作的小窗（置顶）。可在小窗中继续切换视图与编辑。" label="小窗说明" />
+              桌面便签
+              <HelpTip text="无标题栏磨砂便签：置顶列出今日/收件箱任务，可勾选完成。不是缩小的主窗口。" label="便签说明" />
             </h3>
             <label class="settings-toggle">
               <input type="checkbox" :checked="miniWindowEnabled" @change="toggleMini(($event.target as HTMLInputElement).checked)" />
-              <span>固定桌面小窗（可操作）</span>
+              <span>固定桌面便签（磨砂列表）</span>
             </label>
             <div class="settings-actions">
-              <button type="button" class="btn-ghost sm" @click="(ws as any).openMiniWindow?.()">打开小窗</button>
-              <button type="button" class="btn-ghost sm" @click="(ws as any).closeMiniWindow?.()">关闭小窗</button>
+              <button type="button" class="btn-ghost sm" @click="(ws as any).openMiniWindow?.()">打开便签</button>
+              <button type="button" class="btn-ghost sm" @click="(ws as any).closeMiniWindow?.()">关闭便签</button>
             </div>
           </section>
 

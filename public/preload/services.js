@@ -99,29 +99,53 @@ function folderKind(relFolder) {
   return 'note'
 }
 
+function todayIsoLocal() {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return y + '-' + m + '-' + d
+}
+
+function addDaysIso(base, n) {
+  const d = new Date(base + 'T12:00:00')
+  d.setDate(d.getDate() + n)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return y + '-' + m + '-' + day
+}
+
 function ensureSampleNote(root) {
   const workDir = path.join(root, '工作')
   fs.mkdirSync(workDir, { recursive: true })
   const sample = path.join(workDir, '快速开始.md')
   if (fs.existsSync(sample)) return sample
 
+  const date = todayIsoLocal()
+  const end = addDaysIso(date, 4)
+  const due = addDaysIso(date, 2)
   const content = `# 快速开始
 
 这是一篇普通笔记，不是「只能写周计划」。用文件夹区分个人 / 工作 / 今日 / 长期 / 记录即可。
 
-## 待办（进「待办」列表）
+普通勾选不会进投影：
 
-- [ ] 回复邮件 @due(2026-07-21) #琐事
-- [ ] 整理桌面
+- [ ] 这是一条普通清单，不会被任务工作台收录
 
-## 跨日任务（进「甘特」看进度条）
+<!-- mdw:tasks id="release-plan" name="发布计划" color="violet" -->
 
-- [ ] 写产品需求 @start(2026-07-20) @end(2026-07-24) #工作
-- [ ] 完成技术调研 @start(2026-07-15) @end(2026-07-18) #工作
+## 示例任务
+
+- [ ] 写产品需求 @id(requirements) @start(${date}) @end(${end}) @priority(high) #工作
+  - [ ] 整理评审材料 @id(review-kit) @due(${due}) #协作
+- [ ] 发布里程碑 @id(release) @type(milestone) @date(${end}) @color(green)
+
+<!-- /mdw:tasks -->
 
 ## 记录
 
-灵感和会议纪要写在这里，没有 `- [ ]` 就不会进待办 / 甘特 / 日历。
+灵感和会议纪要写在这里；只有 Task Block 内的 \`- [ ]\` 才会进待办 / 甘特 / 日历。
 `
 
   fs.writeFileSync(sample, content, 'utf8')
