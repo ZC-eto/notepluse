@@ -538,53 +538,37 @@ onBeforeUnmount(cleanupDragListeners)
       <span>需先有任务组</span>
     </p>
 
-    <div v-if="!scheduledTasks.length" class="gantt-empty">
-      <div class="gantt-empty-mark" aria-hidden="true">
-        <span class="workline-mini" />
-      </div>
-      <div class="empty-title-row">
-        <div class="empty-title">暂无可绘制的排期</div>
-        <HelpTip :text="ganttEmptyHelpText" label="空排期说明" />
-      </div>
-      <template v-if="!hasTargets">
-        <p class="empty-desc">甘特只投影任务组中的跨日区间与里程碑。可先填充示例体验，或在源码中声明任务组。</p>
-        <div class="empty-actions">
-          <button type="button" class="btn-solid" @click="fillDemoSamples">填充示例数据</button>
-          <span class="composer-inline-help">
-            <HelpTip :text="taskBlockHowToText" label="如何写任务组" />
-            <span>如何写任务组</span>
-          </span>
-        </div>
-      </template>
-      <p v-else class="empty-desc">在上方填写标题与跨日区间即可添加。</p>
-    </div>
-
-    <template v-else>
-      <div class="gantt-board">
+    <div class="gantt-stage" :class="{ 'is-empty': !scheduledTasks.length }">
+      <div class="gantt-board" :aria-hidden="!scheduledTasks.length">
         <div class="gantt-left">
           <div class="gantt-corner">任务</div>
-          <div
-            v-for="entry in scheduledTasks"
-            :key="rowId(entry.task)"
-            class="gantt-label"
-            :class="{ done: entry.task.done, 'is-readonly': !canWrite(entry.task) }"
-            :style="{ paddingInlineStart: `${12 + entry.task.depth * 12}px` }"
-          >
-            <input type="checkbox" :checked="entry.task.done" :disabled="!canWrite(entry.task)" :aria-label="`切换 ${displayTaskTitle(entry.task.title)} 完成状态`" @change="toggleTask(entry.task)" />
-            <button
-              type="button"
-              class="gantt-label-select"
-              :class="{ selected: isEntrySelected(entry) }"
-              :title="barTitle(entry)"
-              @click="selectEntry(entry)"
+          <template v-if="scheduledTasks.length">
+            <div
+              v-for="entry in scheduledTasks"
+              :key="rowId(entry.task)"
+              class="gantt-label"
+              :class="{ done: entry.task.done, 'is-readonly': !canWrite(entry.task) }"
+              :style="{ paddingInlineStart: `${12 + entry.task.depth * 12}px` }"
             >
-              <span class="gantt-label-text">
-                <span :style="{ color: taskColor(entry.task) }" aria-hidden="true">{{ entry.kind === 'milestone' ? '◆' : '—' }}</span>
-                {{ displayTaskTitle(entry.task.title) }}
-                <small> · {{ headingLabel(entry.task) }} · {{ sourceLabel(entry.task) }}</small>
-              </span>
-            </button>
-            <button type="button" class="gantt-del" :disabled="!canWrite(entry.task)" :title="canWrite(entry.task) ? '删除' : '只读任务不可删除'" @click="requestRemove(entry.task)">×</button>
+              <input type="checkbox" :checked="entry.task.done" :disabled="!canWrite(entry.task)" :aria-label="`切换 ${displayTaskTitle(entry.task.title)} 完成状态`" @change="toggleTask(entry.task)" />
+              <button
+                type="button"
+                class="gantt-label-select"
+                :class="{ selected: isEntrySelected(entry) }"
+                :title="barTitle(entry)"
+                @click="selectEntry(entry)"
+              >
+                <span class="gantt-label-text">
+                  <span :style="{ color: taskColor(entry.task) }" aria-hidden="true">{{ entry.kind === 'milestone' ? '◆' : '—' }}</span>
+                  {{ displayTaskTitle(entry.task.title) }}
+                  <small> · {{ headingLabel(entry.task) }} · {{ sourceLabel(entry.task) }}</small>
+                </span>
+              </button>
+              <button type="button" class="gantt-del" :disabled="!canWrite(entry.task)" :title="canWrite(entry.task) ? '删除' : '只读任务不可删除'" @click="requestRemove(entry.task)">×</button>
+            </div>
+          </template>
+          <div v-else class="gantt-label gantt-label-placeholder" aria-hidden="true">
+            <span class="gantt-label-text muted">暂无跨日任务</span>
           </div>
         </div>
 
@@ -603,30 +587,56 @@ onBeforeUnmount(cleanupDragListeners)
               </div>
             </div>
             <div v-if="todayLineLeft != null" class="gantt-today-line" :style="{ left: `${todayLineLeft}px` }" title="今天" />
-            <div v-for="entry in scheduledTasks" :key="`bar-${rowId(entry.task)}`" class="gantt-row">
-              <div
-                v-if="entry.kind === 'range'"
-                class="gantt-bar"
-                :class="{ done: entry.task.done, dragging: drag?.entry && rowId(drag.entry.task) === rowId(entry.task), selected: isEntrySelected(entry), 'is-readonly': !canWrite(entry.task) }"
-                :style="barStyle(entry)"
-                :title="barTitle(entry)"
-                role="button"
-                tabindex="0"
-                :aria-label="entryAriaLabel(entry)"
-                @click="selectEntry(entry)"
-                @keydown="onEntryKeydown(entry, $event)"
-                @pointerdown="selectEntry(entry); onPointerDown(entry, 'move', $event)"
-              >
-                <span class="gantt-handle left" :aria-hidden="!canWrite(entry.task)" @pointerdown.stop="onPointerDown(entry, 'resize-start', $event)" />
-                <span class="gantt-bar-label">{{ displayTaskTitle(entry.task.title) }}</span>
-                <span class="gantt-handle right" :aria-hidden="!canWrite(entry.task)" @pointerdown.stop="onPointerDown(entry, 'resize-end', $event)" />
+            <template v-if="scheduledTasks.length">
+              <div v-for="entry in scheduledTasks" :key="`bar-${rowId(entry.task)}`" class="gantt-row">
+                <div
+                  v-if="entry.kind === 'range'"
+                  class="gantt-bar"
+                  :class="{ done: entry.task.done, dragging: drag?.entry && rowId(drag.entry.task) === rowId(entry.task), selected: isEntrySelected(entry), 'is-readonly': !canWrite(entry.task) }"
+                  :style="barStyle(entry)"
+                  :title="barTitle(entry)"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="entryAriaLabel(entry)"
+                  @click="selectEntry(entry)"
+                  @keydown="onEntryKeydown(entry, $event)"
+                  @pointerdown="selectEntry(entry); onPointerDown(entry, 'move', $event)"
+                >
+                  <span class="gantt-handle left" :aria-hidden="!canWrite(entry.task)" @pointerdown.stop="onPointerDown(entry, 'resize-start', $event)" />
+                  <span class="gantt-bar-label">{{ displayTaskTitle(entry.task.title) }}</span>
+                  <span class="gantt-handle right" :aria-hidden="!canWrite(entry.task)" @pointerdown.stop="onPointerDown(entry, 'resize-end', $event)" />
+                </div>
+                <div v-else class="gantt-milestone" :class="{ selected: isEntrySelected(entry), 'is-readonly': !canWrite(entry.task) }" :style="barStyle(entry)" :title="barTitle(entry)" role="button" tabindex="0" :aria-label="entryAriaLabel(entry)" @click="selectEntry(entry)" @keydown="onEntryKeydown(entry, $event)" />
               </div>
-              <div v-else class="gantt-milestone" :class="{ selected: isEntrySelected(entry), 'is-readonly': !canWrite(entry.task) }" :style="barStyle(entry)" :title="barTitle(entry)" role="button" tabindex="0" :aria-label="entryAriaLabel(entry)" @click="selectEntry(entry)" @keydown="onEntryKeydown(entry, $event)" />
+            </template>
+            <div v-else class="gantt-row gantt-row-placeholder" aria-hidden="true">
+              <div class="gantt-ghost-bar" />
+              <div class="gantt-ghost-bar short" />
             </div>
           </div>
         </div>
       </div>
 
+      <div v-if="!scheduledTasks.length" class="gantt-empty" role="status">
+        <div class="empty-title-row">
+          <div class="empty-title">暂无可绘制的排期</div>
+          <HelpTip :text="ganttEmptyHelpText" label="空排期说明" />
+        </div>
+        <template v-if="!hasTargets">
+          <p class="empty-desc">只显示任务组里的跨日区间与里程碑。可先填示例，或在源码声明任务组。</p>
+          <div class="empty-actions">
+            <button type="button" class="btn-solid" @click="fillDemoSamples">填充示例数据</button>
+            <span class="composer-inline-help">
+              <HelpTip :text="taskBlockHowToText" label="如何写任务组" />
+              <span>如何写任务组</span>
+            </span>
+          </div>
+        </template>
+        <p v-else class="empty-desc">在上方填写标题与跨日区间即可添加。</p>
+      </div>
+    </div>
+
+    <template v-if="scheduledTasks.length">
       <div class="gantt-dates" aria-label="键盘排期编辑">
         <div v-for="entry in scheduledTasks" :key="`${rowId(entry.task)}-edit`" class="date-row" :class="{ 'is-readonly': !canWrite(entry.task), selected: isEntrySelected(entry) }" @click="selectEntry(entry)">
           <button type="button" class="date-name" :title="barTitle(entry)" @click="selectEntry(entry)">{{ displayTaskTitle(entry.task.title) }}</button>
