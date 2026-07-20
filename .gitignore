@@ -1,0 +1,18 @@
+node_modules
+dist
+.DS_Store
+*.local
+.vscode
+.idea
+
+# local / machine-specific / scratch
+.local-backups/
+.playwright-mcp/
+.claude/
+work/
+work_repro.mts
+
+# noisy screenshots (optional keep out of history)
+gantt-inspector-desktop.png
+mdw-gantt-audit.png
+*.log

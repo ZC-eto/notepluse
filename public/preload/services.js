@@ -1,0 +1,409 @@
+const fs = require('node:fs')
+const path = require('node:path')
+const os = require('node:os')
+
+const CONFIG_NAME = 'md-workspace-config.json'
+const DEFAULT_FOLDER_NAME = 'ZToolsNotes'
+/** 默认一级文件夹（物理子目录） */
+const DEFAULT_FOLDERS = ['个人', '工作', '今日待办', '长期待办', '记录']
+/** 「记录」类：日记/流水，不强制任务模板 */
+const RECORD_FOLDER_NAMES = new Set(['记录'])
+
+function safeGetPath(name) {
+  try {
+    if (window.ztools && typeof window.ztools.getPath === 'function') {
+      return window.ztools.getPath(name)
+    }
+  } catch (e) {
+    console.warn('[md-workspace] getPath failed', name, e)
+  }
+  return null
+}
+
+function getConfigPath() {
+  const userData = safeGetPath('userData')
+  if (userData) return path.join(userData, CONFIG_NAME)
+  return path.join(os.homedir(), '.md-workspace-config.json')
+}
+
+function readConfig() {
+  const configPath = getConfigPath()
+  try {
+    if (fs.existsSync(configPath)) {
+      return JSON.parse(fs.readFileSync(configPath, 'utf8'))
+    }
+  } catch (e) {
+    console.error('[md-workspace] readConfig failed', e)
+  }
+  return {}
+}
+
+function writeConfig(partial) {
+  const configPath = getConfigPath()
+  const next = { ...readConfig(), ...partial }
+  fs.mkdirSync(path.dirname(configPath), { recursive: true })
+  fs.writeFileSync(configPath, JSON.stringify(next, null, 2), 'utf8')
+  return next
+}
+
+function sanitizeTitle(title) {
+  return (
+    String(title || '未命名笔记')
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .replace(/\s+/g, ' ')
+      .trim() || '未命名笔记'
+  )
+}
+
+function sanitizeFolderName(name) {
+  return (
+    String(name || '')
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .replace(/\s+/g, ' ')
+      .trim()
+  )
+}
+
+function normalizeRelFolder(folder) {
+  if (!folder) return ''
+  return String(folder)
+    .replace(/\\/g, '/')
+    .split('/')
+    .map((p) => sanitizeFolderName(p))
+    .filter(Boolean)
+    .join('/')
+}
+
+function resolveUnderRoot(root, relFolder) {
+  const rel = normalizeRelFolder(relFolder)
+  if (!rel) return root
+  const parts = rel.split('/')
+  const full = path.join(root, ...parts)
+  const resolvedRoot = path.resolve(root)
+  const resolvedFull = path.resolve(full)
+  if (resolvedFull !== resolvedRoot && !resolvedFull.startsWith(resolvedRoot + path.sep)) {
+    throw new Error('非法文件夹路径: ' + relFolder)
+  }
+  return full
+}
+
+function isRecordFolder(relFolder) {
+  const top = normalizeRelFolder(relFolder).split('/')[0] || ''
+  return RECORD_FOLDER_NAMES.has(top)
+}
+
+function folderKind(relFolder) {
+  const top = normalizeRelFolder(relFolder).split('/')[0] || ''
+  if (RECORD_FOLDER_NAMES.has(top)) return 'record'
+  if (top === '今日待办' || top === '长期待办') return 'todo'
+  return 'note'
+}
+
+function ensureSampleNote(root) {
+  const workDir = path.join(root, '工作')
+  fs.mkdirSync(workDir, { recursive: true })
+  const sample = path.join(workDir, '快速开始.md')
+  if (fs.existsSync(sample)) return sample
+
+  const content = `# 快速开始
+
+这是一篇普通笔记，不是「只能写周计划」。用文件夹区分个人 / 工作 / 今日 / 长期 / 记录即可。
+
+## 待办（进「待办」列表）
+
+- [ ] 回复邮件 @due(2026-07-21) #琐事
+- [ ] 整理桌面
+
+## 跨日任务（进「甘特」看进度条）
+
+- [ ] 写产品需求 @start(2026-07-20) @end(2026-07-24) #工作
+- [ ] 完成技术调研 @start(2026-07-15) @end(2026-07-18) #工作
+
+## 记录
+
+灵感和会议纪要写在这里，没有 `- [ ]` 就不会进待办 / 甘特 / 日历。
+`
+
+  fs.writeFileSync(sample, content, 'utf8')
+  return sample
+}
+
+function ensureDefaultFolders(root) {
+  for (const name of DEFAULT_FOLDERS) {
+    fs.mkdirSync(path.join(root, name), { recursive: true })
+  }
+}
+
+function getNotesRoot() {
+  const cfg = readConfig()
+  if (cfg.notesRoot && fs.existsSync(cfg.notesRoot)) {
+    ensureDefaultFolders(cfg.notesRoot)
+    return cfg.notesRoot
+  }
+
+  const documents = safeGetPath('documents') || path.join(os.homedir(), 'Documents')
+  const root = path.join(documents, DEFAULT_FOLDER_NAME)
+  const isNew = !fs.existsSync(root)
+  fs.mkdirSync(root, { recursive: true })
+  ensureDefaultFolders(root)
+  writeConfig({ notesRoot: root })
+  if (isNew) ensureSampleNote(root)
+  return root
+}
+
+function listFolders() {
+  const root = getNotesRoot()
+  ensureDefaultFolders(root)
+  const folders = []
+
+  function walk(dir, rel) {
+    let entries
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true })
+    } catch (e) {
+      return
+    }
+    for (const ent of entries) {
+      if (!ent.isDirectory()) continue
+      if (ent.name.startsWith('.')) continue
+      const nextRel = rel ? rel + '/' + ent.name : ent.name
+      const fullPath = path.join(dir, ent.name)
+      folders.push({
+        name: ent.name,
+        path: nextRel,
+        fullPath,
+        kind: folderKind(nextRel),
+      })
+      // 仅一层业务文件夹；子目录仍扫描以便扩展
+      walk(fullPath, nextRel)
+    }
+  }
+
+  walk(root, '')
+
+  // 保证默认文件夹按固定顺序靠前
+  const order = new Map(DEFAULT_FOLDERS.map((n, i) => [n, i]))
+  folders.sort((a, b) => {
+    const aTop = a.path.split('/')[0]
+    const bTop = b.path.split('/')[0]
+    const ai = order.has(aTop) ? order.get(aTop) : 1000
+    const bi = order.has(bTop) ? order.get(bTop) : 1000
+    if (ai !== bi) return ai - bi
+    return a.path.localeCompare(b.path, 'zh-CN')
+  })
+
+  return { root, folders, defaults: DEFAULT_FOLDERS.slice() }
+}
+
+function createFolder(name) {
+  const root = getNotesRoot()
+  const safe = sanitizeFolderName(name)
+  if (!safe) throw new Error('文件夹名称为空')
+  const full = path.join(root, safe)
+  if (fs.existsSync(full)) {
+    return {
+      name: safe,
+      path: safe,
+      fullPath: full,
+      kind: folderKind(safe),
+      existed: true,
+    }
+  }
+  fs.mkdirSync(full, { recursive: true })
+  return {
+    name: safe,
+    path: safe,
+    fullPath: full,
+    kind: folderKind(safe),
+    existed: false,
+  }
+}
+
+function walkNotes(dir, relFolder, out) {
+  let entries
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true })
+  } catch (e) {
+    return
+  }
+  for (const ent of entries) {
+    if (ent.name.startsWith('.')) continue
+    const fullPath = path.join(dir, ent.name)
+    if (ent.isDirectory()) {
+      const nextRel = relFolder ? relFolder + '/' + ent.name : ent.name
+      walkNotes(fullPath, nextRel, out)
+      continue
+    }
+    if (!/\.(md|markdown)$/i.test(ent.name)) continue
+    try {
+      const stat = fs.statSync(fullPath)
+      out.push({
+        name: ent.name,
+        path: fullPath,
+        mtime: stat.mtimeMs,
+        size: stat.size,
+        folder: relFolder || '',
+        kind: folderKind(relFolder || ''),
+      })
+    } catch (e) {
+      // skip unreadable
+    }
+  }
+}
+
+function listNotes() {
+  const root = getNotesRoot()
+  ensureDefaultFolders(root)
+  const files = []
+  walkNotes(root, '', files)
+  files.sort((a, b) => b.mtime - a.mtime)
+  const { folders } = listFolders()
+  return { root, files, folders }
+}
+
+function readNote(filePath) {
+  return fs.readFileSync(filePath, 'utf8')
+}
+
+function writeNote(filePath, content) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
+  fs.writeFileSync(filePath, content, 'utf8')
+  return true
+}
+
+function defaultNoteBody(title, relFolder) {
+  const safe = sanitizeTitle(title)
+  if (isRecordFolder(relFolder)) {
+    const d = new Date()
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `# ${safe}\n\n日期：${y}-${m}-${day}\n\n`
+  }
+  return `# ${safe}\n\n`
+}
+
+/**
+ * @param {string} title
+ * @param {string} [folder] 相对 notesRoot 的文件夹路径，如「工作」「记录」
+ */
+function createNote(title, folder, body) {
+  const root = getNotesRoot()
+  const rel = normalizeRelFolder(folder)
+  const dir = resolveUnderRoot(root, rel)
+  fs.mkdirSync(dir, { recursive: true })
+  const safe = sanitizeTitle(title)
+  let filePath = path.join(dir, safe + '.md')
+  let i = 1
+  while (fs.existsSync(filePath)) {
+    filePath = path.join(dir, `${safe}-${i}.md`)
+    i += 1
+  }
+  const content = typeof body === 'string' ? body : defaultNoteBody(safe, rel)
+  fs.writeFileSync(filePath, content, 'utf8')
+  return {
+    path: filePath,
+    name: path.basename(filePath),
+    content,
+    folder: rel,
+    kind: folderKind(rel),
+  }
+}
+
+function deleteNote(filePath) {
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+  return true
+}
+
+function renameNote(filePath, newTitle) {
+  if (!filePath || !fs.existsSync(filePath)) {
+    throw new Error('笔记不存在: ' + filePath)
+  }
+  const dir = path.dirname(filePath)
+  const ext = path.extname(filePath) || '.md'
+  const safe = sanitizeTitle(newTitle)
+  let nextPath = path.join(dir, safe + ext)
+  if (path.resolve(nextPath) === path.resolve(filePath)) {
+    return { path: filePath, name: path.basename(filePath) }
+  }
+  let i = 1
+  while (fs.existsSync(nextPath)) {
+    nextPath = path.join(dir, `${safe}-${i}${ext}`)
+    i += 1
+  }
+  fs.renameSync(filePath, nextPath)
+  return { path: nextPath, name: path.basename(nextPath) }
+}
+
+function setNotesRoot(dirPath) {
+  if (!dirPath) throw new Error('目录路径为空')
+  fs.mkdirSync(dirPath, { recursive: true })
+  if (!fs.existsSync(dirPath)) {
+    throw new Error('目录不存在: ' + dirPath)
+  }
+  ensureDefaultFolders(dirPath)
+  writeConfig({ notesRoot: dirPath })
+  return dirPath
+}
+
+function getNotesRootPath() {
+  return getNotesRoot()
+}
+
+function openInFolder(filePath) {
+  try {
+    let target = filePath
+    if (!target || !fs.existsSync(target)) {
+      target = getNotesRoot()
+    }
+    if (window.ztools && typeof window.ztools.shellShowItemInFolder === 'function') {
+      window.ztools.shellShowItemInFolder(target)
+      return true
+    }
+    if (window.ztools && typeof window.ztools.shellOpenPath === 'function') {
+      const stat = fs.statSync(target)
+      window.ztools.shellOpenPath(stat.isDirectory() ? target : path.dirname(target))
+      return true
+    }
+  } catch (e) {
+    console.warn('[md-workspace] openInFolder failed', e)
+  }
+  return false
+}
+
+function chooseNotesRoot() {
+  try {
+    if (window.ztools && typeof window.ztools.showOpenDialog === 'function') {
+      const result = window.ztools.showOpenDialog({
+        title: '选择笔记目录',
+        defaultPath: getNotesRoot(),
+        properties: ['openDirectory', 'createDirectory'],
+      })
+      if (Array.isArray(result) && result[0]) {
+        return setNotesRoot(result[0])
+      }
+      return null
+    }
+  } catch (e) {
+    console.warn('[md-workspace] chooseNotesRoot failed', e)
+  }
+  return null
+}
+
+window.services = {
+  listNotes,
+  listFolders,
+  createFolder,
+  readNote,
+  writeNote,
+  createNote,
+  deleteNote,
+  renameNote,
+  setNotesRoot,
+  getNotesRootPath,
+  openInFolder,
+  chooseNotesRoot,
+  readConfig,
+  writeConfig,
+  DEFAULT_FOLDERS,
+}

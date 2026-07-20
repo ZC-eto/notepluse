@@ -1,0 +1,291 @@
+﻿<script setup lang="ts">
+import { computed, inject, ref } from 'vue'
+import type { useWorkspace } from '../composables/useWorkspace'
+import type { NoteMeta, SyncProvider } from '../core/types'
+
+const ws = inject('workspace') as ReturnType<typeof useWorkspace>
+const q = ref('')
+const renamingPath = ref('')
+const renameDraft = ref('')
+
+const filteredGroups = computed(() => {
+  const key = q.value.trim().toLowerCase()
+  const groups = (ws.noteGroups || []) as {
+    folder: string
+    label: string
+    kind: string
+    notes: NoteMeta[]
+  }[]
+
+  if (!key) return groups
+
+  return groups
+    .map((g) => ({
+      ...g,
+      notes: g.notes.filter((n) => n.name.toLowerCase().includes(key)),
+    }))
+    .filter((g) => g.notes.length > 0 || g.label.toLowerCase().includes(key))
+})
+
+const totalVisible = computed(() =>
+  filteredGroups.value.reduce((sum, g) => sum + g.notes.length, 0)
+)
+
+function titleOf(name: string) {
+  return name.replace(/\.md$/i, '')
+}
+
+function fmtMtime(ms: number) {
+  if (!ms) return ''
+  const d = new Date(ms)
+  const now = new Date()
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  if (sameDay) {
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
+  return `${d.getMonth() + 1}/${d.getDate()}`
+}
+
+function kindBadge(kind: string) {
+  if (kind === 'record') return '记录'
+  if (kind === 'todo') return '任务'
+  return ''
+}
+
+function startRename(path: string, name: string) {
+  renamingPath.value = path
+  renameDraft.value = titleOf(name)
+}
+
+async function commitRename() {
+  const path = renamingPath.value
+  const title = renameDraft.value.trim()
+  renamingPath.value = ''
+  if (!path || !title) return
+  if (typeof ws.renameNote === 'function') {
+    await ws.renameNote(path, title)
+  }
+}
+
+function onRootChange() {
+  if (typeof ws.changeNotesRoot === 'function') {
+    void ws.changeNotesRoot()
+  }
+}
+
+function onOpenFolder() {
+  if (typeof ws.openInFolder === 'function') {
+    ws.openInFolder()
+  }
+}
+
+function onCreateInFolder(folder: string) {
+  ws.setActiveFolder(folder)
+  void ws.createNote(folder)
+}
+
+function onSelectFolder(folder: string) {
+  ws.setActiveFolder(folder)
+  if (typeof ws.toggleFolderCollapse === 'function' && ws.isFolderCollapsed?.(folder)) {
+    ws.toggleFolderCollapse(folder)
+  }
+}
+
+function onToggleGroup(folder: string) {
+  ws.toggleFolderCollapse(folder)
+}
+
+function onNewFolder() {
+  void ws.createFolder()
+}
+
+function onSyncChange(ev: Event) {
+  const val = (ev.target as HTMLSelectElement).value as SyncProvider
+  void ws.setSyncProvider(val)
+}
+
+function isCollapsed(folder: string) {
+  return !!ws.isFolderCollapsed?.(folder)
+}
+
+function folderPanelId(folder: string, index: number) {
+  const safeFolder = folder.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'root'
+  return `note-folder-${index}-${safeFolder}`
+}
+</script>
+
+<template>
+  <aside id="note-library" class="sidebar" aria-label="笔记库">
+    <div class="sidebar-top">
+      <div class="brand-row">
+        <span class="brand-mark" aria-hidden="true"><i /><i /><i /></span>
+        <div class="brand-text">
+          <div class="brand-name">笔记库</div>
+          <div class="brand-sub">{{ totalVisible }} 篇</div>
+        </div>
+      </div>
+      <div class="sidebar-top-actions">
+        <button class="icon-action" type="button" title="新建文件夹" aria-label="新建文件夹" @click="onNewFolder">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5h6l1.7 2H20a1 1 0 0 1 1 1v8.8a1.7 1.7 0 0 1-1.7 1.7H4.7A1.7 1.7 0 0 1 3 18.3V7a.5.5 0 0 1 .5-.5Zm13 6v5m-2.5-2.5h5" /></svg>
+        </button>
+        <button
+          class="icon-action primary"
+          type="button"
+          title="在当前文件夹新建笔记（Ctrl+N）"
+          aria-label="在当前文件夹新建笔记"
+          @click="ws.createNote()"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="sidebar-search">
+      <label class="sr-only" for="note-search">搜索笔记</label>
+      <span class="search-glyph" aria-hidden="true" />
+      <input id="note-search" v-model="q" class="search-input" type="search" placeholder="搜索笔记" />
+    </div>
+
+    <div v-if="!ws.notes.length" class="onboard-card">
+      <div class="onboard-title">还没有笔记</div>
+      <div class="onboard-desc">清单放进「任务组」后才会出现在待办、日历和甘特。</div>
+      <button type="button" class="btn-solid" @click="ws.createNote(ws.activeFolder)">新建笔记</button>
+    </div>
+    <div v-if="(ws as any).lastDeleted && (ws as any).lastDeleted.expires > Date.now()" class="undo-delete-bar" role="status">
+      <span>已删除「{{ ((ws as any).lastDeleted.name || '').replace(/\.md$/i,'') }}」</span>
+      <button type="button" class="btn-ghost sm" @click="(ws as any).undoDeleteNote?.()">撤销</button>
+    </div>
+
+    <div v-if="!q.trim() && ws.recentNotes && ws.recentNotes.length" class="recent-block">
+      <div class="recent-head"><span>最近打开</span><span class="workline-mini" aria-hidden="true" /></div>
+      <button
+        v-for="note in ws.recentNotes"
+        :key="'recent-' + note.path"
+        type="button"
+        class="note-item recent-item"
+        :class="{ active: note.path === ws.activePath }"
+        :aria-current="note.path === ws.activePath ? 'page' : undefined"
+        @click="ws.openNote(note.path)"
+      >
+        <span class="note-dot" aria-hidden="true" />
+        <span class="note-name">{{ titleOf(note.name) }}</span>
+      </button>
+    </div>
+
+    <div class="note-list">
+      <section
+        v-for="(group, groupIndex) in filteredGroups"
+        :key="group.folder || '__root__'"
+        class="folder-group"
+        :class="{ active: ws.activeFolder === group.folder }"
+      >
+        <div class="folder-head">
+          <button
+            type="button"
+            class="folder-toggle"
+            :aria-label="isCollapsed(group.folder) ? `展开 ${group.label}` : `折叠 ${group.label}`"
+            :aria-expanded="!isCollapsed(group.folder)"
+            :aria-controls="folderPanelId(group.folder, groupIndex)"
+            @click="onToggleGroup(group.folder)"
+          >
+            <span aria-hidden="true" />
+          </button>
+          <button type="button" class="folder-select" :aria-pressed="ws.activeFolder === group.folder" @click="onSelectFolder(group.folder)">
+            <span class="folder-icon" aria-hidden="true"><i /></span>
+            <span class="folder-label">{{ group.label }}</span>
+            <span v-if="kindBadge(group.kind)" class="folder-badge" :data-kind="group.kind">{{ kindBadge(group.kind) }}</span>
+            <span class="folder-count">{{ group.notes.length }}</span>
+          </button>
+          <button
+            type="button"
+            class="folder-add"
+            :aria-label="`在 ${group.label} 新建笔记`"
+            title="在此文件夹新建笔记"
+            @click="onCreateInFolder(group.folder)"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          </button>
+        </div>
+
+        <div :id="folderPanelId(group.folder, groupIndex)" v-show="!isCollapsed(group.folder)" class="folder-notes">
+          <article
+            v-for="note in group.notes"
+            :key="note.path"
+            class="note-item"
+            :class="{ active: note.path === ws.activePath }"
+          >
+            <div v-if="renamingPath === note.path" class="note-open">
+              <span class="note-dot" aria-hidden="true" />
+              <span class="note-main">
+                <input
+                  v-model="renameDraft"
+                  class="rename-input"
+                  aria-label="笔记名称"
+                  @keydown.enter.prevent="commitRename"
+                  @keydown.esc.prevent="renamingPath = ''"
+                  @blur="commitRename"
+                />
+              </span>
+            </div>
+            <button v-else type="button" class="note-open" :title="`打开 ${titleOf(note.name)}`" @click="ws.openNote(note.path)">
+              <span class="note-dot" aria-hidden="true" />
+              <span class="note-main">
+                <span class="note-name">{{ titleOf(note.name) }}</span>
+                <span class="note-mtime">{{ fmtMtime(note.mtime) }}</span>
+              </span>
+            </button>
+            <div class="note-actions">
+              <button type="button" class="note-del" :aria-label="`重命名 ${titleOf(note.name)}`" title="重命名" @click="startRename(note.path, note.name)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16.5-.8 4.3 4.3-.8L18.7 8.8 15.2 5.3 4 16.5Zm9.8-11.2 3.5 3.5" /></svg>
+              </button>
+              <button type="button" class="note-del" :aria-label="`删除 ${titleOf(note.name)}`" title="删除" @click="ws.removeNote(note.path)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14m-9 3v6m4-6v6M9 7l1-2h4l1 2m-8 0 1 13h8l1-13" /></svg>
+              </button>
+            </div>
+          </article>
+
+          <div v-if="!group.notes.length" class="folder-empty">
+            <template v-if="group.kind === 'record'">在这里写下正文、想法或记录。</template>
+            <template v-else-if="group.kind === 'todo'">在任务组中写任务，才会出现在待办视图。</template>
+            <template v-else>此文件夹暂时为空。</template>
+          </div>
+        </div>
+      </section>
+
+      <div v-if="ws.isEmptyWorkspace && !q && ws.notes.length" class="side-onboarding">
+        <div class="side-onboarding-title">开始书写</div>
+        <p class="side-onboarding-desc">需要待办时再插入任务组即可。</p>
+        <button type="button" class="btn-solid sm" @click="ws.createNote()">新建笔记</button>
+        <button type="button" class="btn-ghost sm" @click="ws.openSampleNote()">查看示例</button>
+      </div>
+
+      <div v-if="!filteredGroups.length" class="side-empty">
+        <template v-if="q">无匹配笔记</template>
+      </div>
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="sync-row">
+        <label class="sync-label" for="sync-provider">存储</label>
+        <select id="sync-provider" class="sync-select" :value="ws.syncProvider" @change="onSyncChange">
+          <option value="local">本地文件</option>
+          <option value="webdiv">WebDIV（预留）</option>
+        </select>
+      </div>
+      <div class="sync-hint" :title="ws.syncStatus?.detail">
+        <span class="sync-state-dot" :class="{ offline: !ws.syncStatus?.ready }" aria-hidden="true" />
+        {{ ws.syncStatus?.ready ? ws.syncStatus?.label : (ws.syncStatus?.detail || '本地') }}
+      </div>
+      <div class="root-path" :title="ws.notesRoot">{{ ws.notesRoot || '本地笔记' }}</div>
+      <div class="foot-actions">
+        <button type="button" class="btn-ghost sm" @click="onRootChange">更换目录</button>
+        <button type="button" class="btn-ghost sm" @click="onOpenFolder">打开文件夹</button>
+      </div>
+    </div>
+  </aside>
+</template>
+
+

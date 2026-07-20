@@ -1,0 +1,71 @@
+{
+  "$schema": "node_modules/@ztools-center/ztools-api-types/resource/ztools.schema.json",
+  "name": "md-workspace",
+  "title": "Markdown 工作台",
+  "description": "本地 Markdown 工作台：文件夹·全局待办·甘特/日历·设置与撤销",
+  "author": "ZTools Plugin",
+  "version": "0.7.2",
+  "main": "index.html",
+  "preload": "preload/services.js",
+  "logo": "logo.png",
+  "features": [
+    {
+      "code": "workspace",
+      "explain": "打开 Markdown 工作台",
+      "icon": "logo.png",
+      "cmds": [
+        "md",
+        "笔记",
+        "markdown",
+        "工作台"
+      ]
+    },
+    {
+      "code": "todo",
+      "explain": "打开待办投影",
+      "icon": "logo.png",
+      "cmds": [
+        "todo",
+        "待办"
+      ]
+    },
+    {
+      "code": "gantt",
+      "explain": "打开甘特投影（仅含排期任务）",
+      "icon": "logo.png",
+      "cmds": [
+        "gantt",
+        "甘特"
+      ]
+    },
+    {
+      "code": "calendar",
+      "explain": "打开日历投影（仅含排期任务）",
+      "icon": "logo.png",
+      "cmds": [
+        "日历",
+        "calendar"
+      ]
+    },
+    {
+      "code": "open-file",
+      "explain": "用工作台打开 Markdown 文件",
+      "icon": "logo.png",
+      "cmds": [
+        {
+          "type": "files",
+          "fileType": "file",
+          "maxLength": 1,
+          "extensions": [
+            "md",
+            "markdown"
+          ],
+          "label": "用 Markdown 工作台打开"
+        }
+      ]
+    }
+  ],
+  "development": {
+    "main": "http://localhost:5173"
+  }
+}

@@ -1,0 +1,1271 @@
+import { computed, reactive, ref } from 'vue'
+import type {
+  AppView,
+  EditorMode,
+  FolderKind,
+  FolderMeta,
+  GlobalTask,
+  NoteGroup,
+  NoteMeta,
+  SyncProvider,
+  TaskBlockTarget,
+} from '../core/types'
+import { parseScheduledTasks, parseTasks, countTasks, parseTaskDocument } from '../core/parseTasks'
+import {
+  collectGlobalTasks,
+  countGlobalTasks,
+  type NoteTaskCacheEntry,
+} from '../core/globalTasks'
+import {
+  appendTask,
+  toggleTaskDone,
+  updateTaskSchedule,
+  applyTaskPatch,
+  removeTask,
+} from '../core/writeTasks'
+import type { Task, TaskPatch } from '../core/types'
+import { askConfirm, askPrompt } from './uiDialog'
+import {
+  DEFAULT_SYNC_PROVIDER,
+  loadSyncProvider,
+  saveSyncProvider,
+  getSyncProviderStatus,
+} from '../core/webdivSync'
+
+const DEMO_PLAN_PATH = 'demo://工作/快速开始'
+const DEFAULT_FOLDERS = ['个人', '工作', '今日待办', '长期待办', '记录']
+
+const notes = ref<NoteMeta[]>([])
+const folders = ref<FolderMeta[]>([])
+const notesRoot = ref('')
+const activePath = ref('')
+const activeFolder = ref('')
+const content = ref('')
+const dirty = ref(false)
+const view = ref<AppView>('editor')
+const editorMode = ref<EditorMode>('wysiwyg')
+const status = ref('')
+const saving = ref(false)
+const saveError = ref('')
+const recentPaths = ref<string[]>([])
+const settingsOpen = ref(false)
+const syncProvider = ref<SyncProvider>(DEFAULT_SYNC_PROVIDER)
+const defaultView = ref<AppView>('todo')
+const defaultEditorMode = ref<EditorMode>('wysiwyg')
+/** 内容撤销栈（源码级可靠） */
+const undoStack = ref<string[]>([])
+const redoStack = ref<string[]>([])
+let applyingHistory = false
+/** 最近删除的笔记（最小撤销） */
+const lastDeleted = ref<{ path: string; name: string; content: string; folder: string; kind: FolderKind; expires: number } | null>(null)
+const collapsedFolders = ref<Record<string, boolean>>({})
+/** demo 模式下的内存内容，避免切笔记丢内容 */
+const demoStore = new Map<string, string>()
+
+/** 跨笔记任务扫描缓存（按 path + mtime） */
+const allTasksCache = new Map<string, NoteTaskCacheEntry>()
+/** 手动 bump，强制 allTasks 重算（例如改了其他笔记） */
+const allTasksBump = ref(0)
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+let openSeq = 0
+let flushChain: Promise<boolean> = Promise.resolve(true)
+/** 仅首次从 config 套用默认视图/编辑模式，避免刷新笔记时打断当前会话 */
+let prefsApplied = false
+
+function isAppView(v: unknown): v is AppView {
+  return v === 'editor' || v === 'todo' || v === 'gantt' || v === 'calendar'
+}
+
+function isEditorMode(v: unknown): v is EditorMode {
+  return v === 'wysiwyg' || v === 'source'
+}
+
+function writeUserConfig(partial: Record<string, unknown>) {
+  if (window.services && typeof window.services.writeConfig === 'function') {
+    return window.services.writeConfig(partial)
+  }
+  return partial
+}
+
+function todayIso() {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return y + '-' + m + '-' + d
+}
+
+function todayPlanBody(date: string) {
+  return `# 日程页 — ${date}
+
+这是一张可自由编辑的日程页。只有下方明确的 Task Block 会进入待办、日历和甘特视图。
+
+<!-- mdw:tasks id="daily-${date}" name="${date} 日程" color="blue" -->
+
+## 今日焦点
+
+- [ ] 完成一项重要工作 @id(focus-${date}) @date(${date}) @priority(high)
+
+<!-- /mdw:tasks -->
+
+## 记录
+
+`
+}
+
+function clearSaveTimer() {
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+}
+
+function formatSaveError(e: unknown): string {
+  if (e instanceof Error && e.message) return e.message
+  if (typeof e === 'string' && e.trim()) return e.trim()
+  return '写入失败，请重试'
+}
+
+function rememberRecent(path: string) {
+  if (!path) return
+  recentPaths.value = [path, ...recentPaths.value.filter((p) => p !== path)].slice(0, 12)
+}
+
+function sortNotesByMtime(list: NoteMeta[]): NoteMeta[] {
+  return [...list].sort((a, b) => (b.mtime || 0) - (a.mtime || 0))
+}
+
+function sanitizeTitle(title: string): string {
+  return (
+    String(title || '未命名笔记')
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .replace(/\s+/g, ' ')
+      .trim() || '未命名笔记'
+  )
+}
+
+function folderKindOf(folder: string): FolderKind {
+  const top = (folder || '').split(/[/\\]/)[0] || ''
+  if (top === '记录') return 'record'
+  if (top === '今日待办' || top === '长期待办') return 'todo'
+  return 'note'
+}
+
+function ensureFolderList(list: FolderMeta[]): FolderMeta[] {
+  const map = new Map(list.map((f) => [f.path, f]))
+  for (const name of DEFAULT_FOLDERS) {
+    if (!map.has(name)) {
+      map.set(name, { name, path: name, kind: folderKindOf(name) })
+    }
+  }
+  const order = new Map(DEFAULT_FOLDERS.map((n, i) => [n, i]))
+  return [...map.values()].sort((a, b) => {
+    const aTop = a.path.split('/')[0]
+    const bTop = b.path.split('/')[0]
+    const ai = order.has(aTop) ? (order.get(aTop) as number) : 1000
+    const bi = order.has(bTop) ? (order.get(bTop) as number) : 1000
+    if (ai !== bi) return ai - bi
+    return a.path.localeCompare(b.path, 'zh-CN')
+  })
+}
+
+function demoInit() {
+  notesRoot.value = notesRoot.value || '(demo)'
+  folders.value = ensureFolderList(
+    DEFAULT_FOLDERS.map((name) => ({ name, path: name, kind: folderKindOf(name) }))
+  )
+  if (!notes.value.length) {
+    const body = demoContent()
+    const personalPath = 'demo://个人/购物清单'
+    const personalBody = `# 购物清单
+
+- [ ] 牛奶 @id(demo-milk)
+- [ ] 面包 @id(demo-bread)
+- [x] 鸡蛋 @id(demo-egg)
+`
+    demoStore.set(DEMO_PLAN_PATH, body)
+    demoStore.set(personalPath, personalBody)
+    notes.value = [
+      {
+        name: '快速开始.md',
+        path: DEMO_PLAN_PATH,
+        mtime: Date.now(),
+        size: 1,
+        folder: '工作',
+        kind: 'note',
+      },
+      {
+        name: '购物清单.md',
+        path: personalPath,
+        mtime: Date.now() - 1000,
+        size: 1,
+        folder: '个人',
+        kind: 'note',
+      },
+    ]
+    // 空库仅提供可选示例，不自动打开，避免默认标题绑架首屏
+    activePath.value = ''
+    activeFolder.value = '工作'
+    content.value = ''
+  }
+}
+
+export function useWorkspace() {
+
+  function loadUiPrefs() {
+    try {
+      const cfg = (window.services?.readConfig?.() || {}) as Record<string, unknown>
+      if (isAppView(cfg.defaultView)) defaultView.value = cfg.defaultView
+      if (isEditorMode(cfg.defaultEditorMode)) defaultEditorMode.value = cfg.defaultEditorMode
+      if (!prefsApplied) {
+        view.value = defaultView.value
+        editorMode.value = defaultEditorMode.value
+        prefsApplied = true
+      }
+    } catch {}
+  }
+
+  function persistUiPrefs() {
+    if (!window.services?.writeConfig) return
+    window.services.writeConfig({
+      defaultView: defaultView.value,
+      defaultEditorMode: defaultEditorMode.value,
+    })
+  }
+
+  function setDefaultView(v: AppView) {
+    if (!isAppView(v)) return
+    defaultView.value = v
+    view.value = v
+    persistUiPrefs()
+    status.value = '已保存默认视图'
+  }
+
+  function setDefaultEditorMode(m: EditorMode) {
+    if (!isEditorMode(m)) return
+    defaultEditorMode.value = m
+    editorMode.value = m
+    persistUiPrefs()
+    status.value = '已保存默认编辑模式'
+  }
+
+  function pushUndoSnapshot(prev: string) {
+    if (applyingHistory) return
+    if (undoStack.value.length && undoStack.value[undoStack.value.length - 1] === prev) return
+    undoStack.value = [...undoStack.value.slice(-40), prev]
+    redoStack.value = []
+  }
+
+  function undoContent(): boolean {
+    if (!undoStack.value.length) {
+      status.value = '没有可撤销的编辑'
+      return false
+    }
+    const prev = undoStack.value[undoStack.value.length - 1]
+    undoStack.value = undoStack.value.slice(0, -1)
+    redoStack.value = [...redoStack.value, content.value]
+    applyingHistory = true
+    content.value = prev
+    if (activePath.value.startsWith('demo://')) demoStore.set(activePath.value, prev)
+    dirty.value = true
+    saveError.value = ''
+    scheduleSave()
+    applyingHistory = false
+    status.value = '已撤销'
+    return true
+  }
+
+  function redoContent(): boolean {
+    if (!redoStack.value.length) {
+      status.value = '没有可重做的编辑'
+      return false
+    }
+    const next = redoStack.value[redoStack.value.length - 1]
+    redoStack.value = redoStack.value.slice(0, -1)
+    undoStack.value = [...undoStack.value, content.value]
+    applyingHistory = true
+    content.value = next
+    if (activePath.value.startsWith('demo://')) demoStore.set(activePath.value, next)
+    dirty.value = true
+    saveError.value = ''
+    scheduleSave()
+    applyingHistory = false
+    status.value = '已重做'
+    return true
+  }
+
+  /** 扫描与打开笔记严格只读；绝不自动补写任务 ID。 */
+  function maybeStamp(md: string): { text: string; changed: boolean } {
+    return { text: md, changed: false }
+  }
+
+  const activeTaskDocument = computed(() => parseTaskDocument(content.value))
+  const tasks = computed(() => activeTaskDocument.value.tasks)
+  const taskBlocks = computed(() => activeTaskDocument.value.blocks)
+  const taskDiagnostics = computed(() => activeTaskDocument.value.diagnostics)
+  const preferredTaskBlockId = computed(() => taskBlocks.value.find((block) => block.isValid)?.id || '')
+  const scheduledTasks = computed(() => parseScheduledTasks(content.value))
+  const taskStats = computed(() => countTasks(content.value))
+  const activeNote = computed(() => notes.value.find((n) => n.path === activePath.value) || null)
+  const isEmptyWorkspace = computed(() => notes.value.length === 0)
+
+  /** 当前文件夹最近 3 篇：优先最近打开，不足用 mtime 补齐 */
+  const recentNotes = computed<NoteMeta[]>(() => {
+    const folder = activeFolder.value || ''
+    const inFolder = notes.value.filter((n) => (n.folder || '') === folder)
+    const byPath = new Map(inFolder.map((n) => [n.path, n]))
+    const picked: NoteMeta[] = []
+    for (const path of recentPaths.value) {
+      const note = byPath.get(path)
+      if (!note) continue
+      picked.push(note)
+      if (picked.length >= 3) return picked
+    }
+    for (const note of sortNotesByMtime(inFolder)) {
+      if (picked.some((n) => n.path === note.path)) continue
+      picked.push(note)
+      if (picked.length >= 3) break
+    }
+    return picked
+  })
+
+  function readNoteMarkdown(filePath: string): string {
+    if (!filePath) return ''
+    if (filePath.startsWith('demo://')) return demoStore.get(filePath) || ''
+    if (!window.services?.readNote) return ''
+    return window.services.readNote(filePath)
+  }
+
+  /** 跨笔记全部显式待办（mtime 缓存；当前笔记用内存 content） */
+  const allTasks = computed<GlobalTask[]>(() => {
+    void allTasksBump.value
+    return collectGlobalTasks(notes.value, {
+      readContent: readNoteMarkdown,
+      cache: allTasksCache,
+      activePath: activePath.value,
+      activeContent: content.value,
+    })
+  })
+
+  const allTaskStats = computed(() => countGlobalTasks(allTasks.value))
+
+  /**
+   * 跨笔记可写目标索引。即使一个合法 Task Block 仍为空，也必须出现在选择器中；
+   * 这使新建任务始终是“用户选择笔记 + Block”的显式写入，而不是隐式兜底。
+   */
+  const taskBlockTargets = computed<TaskBlockTarget[]>(() => {
+    void allTasksBump.value
+    const targets: TaskBlockTarget[] = []
+    for (const note of notes.value) {
+      let markdown = ''
+      try {
+        markdown = note.path === activePath.value ? content.value : readNoteMarkdown(note.path)
+      } catch {
+        continue
+      }
+      const parsed = parseTaskDocument(markdown || '')
+      for (const block of parsed.blocks) {
+        if (!block.isValid || !block.id) continue
+        targets.push({
+          notePath: note.path,
+          noteName: note.name.replace(/\.md$/i, '') || '未命名笔记',
+          folder: note.folder || '',
+          blockId: block.id,
+          blockName: block.name || block.id,
+          color: block.color,
+        })
+      }
+    }
+    return targets.sort((a, b) => {
+      const byNote = a.noteName.localeCompare(b.noteName, 'zh-CN')
+      return byNote || a.blockName.localeCompare(b.blockName, 'zh-CN')
+    })
+  })
+
+  function invalidateTaskCache(filePath?: string) {
+    if (filePath) allTasksCache.delete(filePath)
+    else allTasksCache.clear()
+    allTasksBump.value++
+  }
+
+  function touchNoteMeta(filePath: string, md: string) {
+    const note = notes.value.find((n) => n.path === filePath)
+    if (note) {
+      note.mtime = Date.now()
+      note.size = md.length
+    }
+  }
+
+  function writeNoteMarkdown(filePath: string, md: string) {
+    if (filePath.startsWith('demo://')) {
+      demoStore.set(filePath, md)
+      touchNoteMeta(filePath, md)
+      invalidateTaskCache(filePath)
+      return
+    }
+    if (!window.services?.writeNote) return
+    window.services.writeNote(filePath, md)
+    touchNoteMeta(filePath, md)
+    invalidateTaskCache(filePath)
+  }
+
+  /** 对任意笔记应用文本变换（当前笔记走 setContent） */
+  function applyToNote(filePath: string, transform: (md: string) => string) {
+    if (!filePath) return
+    if (filePath === activePath.value) {
+      setContent(transform(content.value))
+      return
+    }
+    const md = readNoteMarkdown(filePath)
+    const next = transform(md)
+    if (next !== md) writeNoteMarkdown(filePath, next)
+  }
+
+
+  /** 侧栏：按文件夹分组的笔记列表 */
+  const noteGroups = computed<NoteGroup[]>(() => {
+    const folderList = ensureFolderList(folders.value)
+    const byFolder = new Map<string, NoteMeta[]>()
+    for (const n of notes.value) {
+      const key = n.folder || ''
+      if (!byFolder.has(key)) byFolder.set(key, [])
+      byFolder.get(key)!.push(n)
+    }
+    const groups: NoteGroup[] = []
+    const seen = new Set<string>()
+
+    for (const f of folderList) {
+      seen.add(f.path)
+      groups.push({
+        folder: f.path,
+        label: f.path,
+        kind: f.kind,
+        notes: sortNotesByMtime(byFolder.get(f.path) || []),
+      })
+    }
+
+    // 根目录笔记
+    if ((byFolder.get('') || []).length) {
+      groups.unshift({
+        folder: '',
+        label: '未分类',
+        kind: 'note',
+        notes: sortNotesByMtime(byFolder.get('') || []),
+      })
+      seen.add('')
+    }
+
+    // 其它未登记文件夹
+    for (const [key, list] of byFolder) {
+      if (seen.has(key)) continue
+      groups.push({
+        folder: key,
+        label: key || '未分类',
+        kind: folderKindOf(key),
+        notes: sortNotesByMtime(list),
+      })
+    }
+
+    return groups
+  })
+
+  const syncStatus = computed(() => getSyncProviderStatus(syncProvider.value))
+
+  function loadSettingsFromConfig() {
+    try {
+      const cfg = (window.services?.readConfig?.() || {}) as Record<string, unknown>
+      syncProvider.value = loadSyncProvider(cfg)
+
+      const cfgView = isAppView(cfg.defaultView) ? cfg.defaultView : 'editor'
+      const cfgMode = isEditorMode(cfg.defaultEditorMode) ? cfg.defaultEditorMode : 'wysiwyg'
+      defaultView.value = cfgView
+      defaultEditorMode.value = cfgMode
+
+      if (!prefsApplied) {
+        view.value = cfgView
+        editorMode.value = cfgMode
+        prefsApplied = true
+      }
+    } catch {
+      syncProvider.value = DEFAULT_SYNC_PROVIDER
+      if (!prefsApplied) {
+        defaultView.value = 'editor'
+        defaultEditorMode.value = 'wysiwyg'
+        view.value = 'editor'
+        editorMode.value = 'wysiwyg'
+        prefsApplied = true
+      }
+    }
+  }
+
+  async function setSyncProvider(provider: SyncProvider) {
+    if (provider === 'webdiv') {
+      const st = getSyncProviderStatus('webdiv')
+      if (!st.ready) {
+        status.value = 'WebDIV 尚未接通，无法启用'
+        return
+      }
+    }
+    syncProvider.value = provider
+    try {
+      if (window.services && typeof window.services.writeConfig === 'function') {
+        saveSyncProvider((partial) => window.services.writeConfig(partial), provider)
+      } else {
+        writeUserConfig({ syncProvider: provider })
+      }
+      status.value =
+        provider === 'webdiv' ? '已选择 WebDIV（预留，未接通）' : '已使用本地文件'
+    } catch (e) {
+      status.value = '保存同步设置失败'
+      console.error(e)
+    }
+  }
+
+  async function refreshNotes() {
+    loadUiPrefs()
+    if (!window.services?.listNotes) {
+      demoInit()
+      notes.value = sortNotesByMtime(notes.value)
+      if (!activePath.value || !notes.value.find((n) => n.path === activePath.value)) {
+        const first = notes.value[0]
+        if (first) await openNote(first.path)
+      }
+      return
+    }
+
+    loadSettingsFromConfig()
+    const res = window.services.listNotes()
+    notesRoot.value = res.root
+    notes.value = sortNotesByMtime(
+      (res.files || []).map((f) => ({
+        ...f,
+        folder: f.folder || '',
+        kind: f.kind || folderKindOf(f.folder || ''),
+      }))
+    )
+    if (res.folders && res.folders.length) {
+      folders.value = ensureFolderList(
+        res.folders.map((f) => ({
+          name: f.name,
+          path: f.path,
+          fullPath: f.fullPath,
+          kind: f.kind || folderKindOf(f.path),
+        }))
+      )
+    } else if (window.services.listFolders) {
+      const lf = window.services.listFolders()
+      folders.value = ensureFolderList(
+        (lf.folders || []).map((f) => ({
+          name: f.name,
+          path: f.path,
+          fullPath: f.fullPath,
+          kind: f.kind || folderKindOf(f.path),
+        }))
+      )
+    } else {
+      folders.value = ensureFolderList([])
+    }
+
+    if (!activePath.value && res.files[0]) {
+      await openNote(res.files[0].path)
+    } else if (activePath.value && !res.files.find((f) => f.path === activePath.value)) {
+      if (res.files[0]) await openNote(res.files[0].path)
+      else {
+        activePath.value = ''
+        content.value = ''
+      }
+    }
+  }
+
+  async function openNote(filePath: string) {
+    if (!filePath) return
+    if (filePath === activePath.value) {
+      rememberRecent(filePath)
+      return
+    }
+
+    const seq = ++openSeq
+    clearSaveTimer()
+
+    // 切换前先落盘；失败则中止，避免未保存内容被覆盖丢失
+    if (dirty.value && activePath.value) {
+      const ok = await flushSave()
+      if (!ok) {
+        status.value = '保存失败，请重试后再切换'
+        return
+      }
+    }
+    if (seq !== openSeq) return
+
+    activePath.value = filePath
+    const meta = notes.value.find((n) => n.path === filePath)
+    if (meta) activeFolder.value = meta.folder || ''
+
+    let next = ''
+    if (filePath.startsWith('demo://')) {
+      if (!demoStore.has(filePath)) {
+        if (filePath === DEMO_PLAN_PATH) {
+          demoStore.set(filePath, demoContent())
+        } else {
+          const note = notes.value.find((n) => n.path === filePath)
+          const title = note ? note.name.replace(/\.md$/i, '') : '新笔记'
+          demoStore.set(filePath, `# ${title}\n\n`)
+        }
+      }
+      next = demoStore.get(filePath) || ''
+    } else {
+      next = window.services?.readNote ? window.services.readNote(filePath) : ''
+    }
+
+    if (seq !== openSeq) return
+
+    // 可选：仅对显式任务行补 ID；关闭后纯浏览不落盘改写
+    undoStack.value = []
+    redoStack.value = []
+    const { text: stamped, changed } = maybeStamp(next)
+    content.value = stamped
+    if (filePath.startsWith('demo://')) {
+      demoStore.set(filePath, stamped)
+    }
+    dirty.value = changed
+    saveError.value = ''
+    status.value = changed ? '已补全任务 ID' : ''
+    rememberRecent(filePath)
+    if (changed) scheduleSave()
+  }
+
+  function setContent(next: string, markDirty = true) {
+    const { text: stamped } = maybeStamp(next)
+    if (markDirty && !applyingHistory && stamped !== content.value) {
+      pushUndoSnapshot(content.value)
+    }
+    content.value = stamped
+    if (activePath.value.startsWith('demo://')) {
+      demoStore.set(activePath.value, stamped)
+    }
+    if (markDirty) {
+      dirty.value = true
+      saveError.value = ''
+      scheduleSave()
+    }
+  }
+
+  function scheduleSave() {
+    clearSaveTimer()
+    saveTimer = setTimeout(() => {
+      void flushSave()
+    }, 450)
+  }
+
+  /**
+   * 将当前脏内容写入磁盘/内存。
+   * @returns true 表示目标快照已成功落盘（或本就无需保存）
+   */
+  async function flushSave(): Promise<boolean> {
+    const run = async (): Promise<boolean> => {
+      clearSaveTimer()
+      if (!dirty.value || !activePath.value) {
+        if (!dirty.value && activePath.value && !saveError.value) status.value = '已保存'
+        return true
+      }
+
+      // 冻结路径与内容，避免切换/连点导致写错文件或清错 dirty
+      const path = activePath.value
+      const body = content.value
+
+      if (path.startsWith('demo://')) {
+        demoStore.set(path, body)
+        if (activePath.value === path && content.value === body) {
+          dirty.value = false
+          saveError.value = ''
+          status.value = '已保存'
+        } else if (activePath.value === path) {
+          // 保存期间又改了：保持 dirty，稍后自动再存
+          saveError.value = ''
+          scheduleSave()
+        }
+        const note = notes.value.find((n) => n.path === path)
+        if (note) note.mtime = Date.now()
+        notes.value = sortNotesByMtime(notes.value)
+        invalidateTaskCache(path)
+        return true
+      }
+
+      if (!window.services?.writeNote) {
+        saveError.value = '当前环境无法写入文件'
+        status.value = '保存失败'
+        return false
+      }
+
+      saving.value = true
+      try {
+        window.services.writeNote(path, body)
+        if (activePath.value === path) {
+          if (content.value === body) {
+            dirty.value = false
+            saveError.value = ''
+            status.value = '已保存'
+          } else {
+            // 写入成功但之后又编辑了
+            saveError.value = ''
+            status.value = '未保存'
+            scheduleSave()
+          }
+        } else {
+          // 已切到其他笔记：旧笔记内容已落盘
+          saveError.value = saveError.value
+        }
+        invalidateTaskCache(path)
+        // 仅刷新列表元数据，不重载当前正文
+        try {
+          await refreshNotes()
+        } catch (e) {
+          console.warn('[md-workspace] refresh after save failed', e)
+        }
+        return true
+      } catch (e) {
+        saveError.value = formatSaveError(e)
+        status.value = '保存失败'
+        console.error(e)
+        return false
+      } finally {
+        saving.value = false
+      }
+    }
+
+    const next = flushChain.then(run, run)
+    flushChain = next.then(
+      () => true,
+      () => false
+    )
+    return next
+  }
+
+  async function retrySave(): Promise<boolean> {
+    if (!activePath.value) return false
+    if (!dirty.value && !saveError.value) {
+      status.value = '已保存'
+      return true
+    }
+    // 失败后 dirty 仍为 true；若异常清空则强制再写一次当前内容
+    if (!dirty.value && saveError.value) dirty.value = true
+    status.value = '正在重试保存…'
+    return flushSave()
+  }
+
+  /**
+   * @param folder 目标文件夹相对路径；省略时用当前 activeFolder
+   */
+  async function createNote(folder?: string, options?: { title?: string; body?: string }) {
+    const targetFolder = folder !== undefined ? folder : activeFolder.value || ''
+    const kind = folderKindOf(targetFolder)
+    const date = todayIso()
+    const title = options?.title || (kind === 'record' ? `记录-${date}` : `笔记-${date}`)
+    const body =
+      options?.body !== undefined
+        ? options.body
+        : kind === 'record'
+          ? `# ${title}\n\n日期：${date}\n\n`
+          : `# ${title}\n\n`
+
+    if (dirty.value && activePath.value) {
+      const ok = await flushSave()
+      if (!ok) {
+        status.value = '保存失败，请重试后再新建'
+        return
+      }
+    }
+
+    if (!window.services?.createNote) {
+      const path = `demo://${targetFolder ? targetFolder + '/' : ''}${Date.now()}`
+      const stamped = body
+      demoStore.set(path, stamped)
+      notes.value = sortNotesByMtime([
+        {
+          name: title + '.md',
+          path,
+          mtime: Date.now(),
+          size: stamped.length,
+          folder: targetFolder,
+          kind,
+        },
+        ...notes.value,
+      ])
+      activeFolder.value = targetFolder
+      activePath.value = path
+      content.value = stamped
+      dirty.value = false
+      saveError.value = ''
+      status.value = ''
+      rememberRecent(path)
+      invalidateTaskCache()
+      return
+    }
+
+    const note = window.services.createNote(title, targetFolder || undefined, body)
+    if (typeof options?.body === 'string' && window.services.writeNote && note.path) {
+      try {
+        window.services.writeNote(note.path, options.body)
+      } catch {
+        /* ignore */
+      }
+    }
+    activeFolder.value = note.folder || targetFolder
+    await refreshNotes()
+    await openNote(note.path)
+  }
+
+  async function createTodayPlan() {
+    const date = todayIso()
+    const title = `今日计划-${date}`
+    const existing = notes.value.find(
+      (n) => n.folder === '今日待办' && n.name.replace(/\.md$/i, '') === title
+    )
+    if (existing) {
+      await openNote(existing.path)
+      status.value = '已打开今日计划'
+      return
+    }
+    await createNote('今日待办', { title, body: todayPlanBody(date) })
+    status.value = '已新建今日计划'
+  }
+
+  async function openSampleNote() {
+    const sample = notes.value.find(
+      (n) =>
+        n.name === '快速开始.md' ||
+        n.path.endsWith('/快速开始.md') ||
+        n.path.endsWith('\\快速开始.md') ||
+        n.path === DEMO_PLAN_PATH
+    )
+    if (sample) {
+      await openNote(sample.path)
+      status.value = '已打开示例笔记'
+      return
+    }
+    await createNote('工作', { title: '快速开始', body: demoContent() })
+    status.value = '已创建示例笔记'
+  }
+
+  async function createFolder(name?: string) {
+    const raw = name || (await askPrompt({
+      title: '新建文件夹',
+      message: '用于区分个人 / 工作 / 今日待办 / 长期待办 / 记录等。',
+      placeholder: '例如：个人 · 工作 · 项目A',
+      confirmText: '创建',
+    }))
+    if (!raw) return
+    const safe = String(raw)
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (!safe) return
+
+    if (!window.services?.createFolder) {
+      if (!folders.value.find((f) => f.path === safe)) {
+        folders.value = ensureFolderList([
+          ...folders.value,
+          { name: safe, path: safe, kind: folderKindOf(safe) },
+        ])
+      }
+      activeFolder.value = safe
+      status.value = '已新建文件夹（演示）'
+      return
+    }
+
+    try {
+      const folder = window.services.createFolder(safe)
+      activeFolder.value = folder.path
+      status.value = folder.existed ? '文件夹已存在' : '已新建文件夹'
+      await refreshNotes()
+    } catch (e) {
+      status.value = '新建文件夹失败'
+      console.error(e)
+    }
+  }
+
+  function setActiveFolder(folder: string) {
+    activeFolder.value = folder
+  }
+
+  function toggleFolderCollapse(folder: string) {
+    collapsedFolders.value = {
+      ...collapsedFolders.value,
+      [folder]: !collapsedFolders.value[folder],
+    }
+  }
+
+  function isFolderCollapsed(folder: string) {
+    return !!collapsedFolders.value[folder]
+  }
+
+  async function renameNote(filePath: string, newTitle: string) {
+    const safe = sanitizeTitle(newTitle)
+    if (!safe) return
+
+    if (filePath.startsWith('demo://') || !window.services?.renameNote) {
+      const note = notes.value.find((n) => n.path === filePath)
+      if (!note) return
+      note.name = safe + '.md'
+      note.mtime = Date.now()
+      notes.value = sortNotesByMtime(notes.value)
+      status.value = '已重命名'
+      return
+    }
+
+    try {
+      if (dirty.value && activePath.value === filePath) {
+        const ok = await flushSave()
+        if (!ok) {
+          status.value = '保存失败，请重试后再重命名'
+          return
+        }
+      }
+      const result = window.services.renameNote(filePath, safe)
+      if (activePath.value === filePath) activePath.value = result.path
+      status.value = '已重命名'
+      await refreshNotes()
+    } catch (e) {
+      status.value = '重命名失败'
+      console.error(e)
+    }
+  }
+
+    async function removeNote(filePath: string) {
+    const ok = await askConfirm({
+      title: '删除笔记',
+      message: '确定删除这篇笔记？\n删除后可在 30 秒内撤销。',
+      confirmText: '删除',
+      danger: true,
+    })
+    if (!ok) return
+    const note = notes.value.find((n) => n.path === filePath)
+    let body = ''
+    try {
+      if (filePath === activePath.value) body = content.value
+      else body = readNoteMarkdown(filePath)
+    } catch {
+      body = ''
+    }
+    lastDeleted.value = {
+      path: filePath,
+      name: note?.name || '笔记.md',
+      content: body,
+      folder: note?.folder || '',
+      kind: note?.kind || 'note',
+      expires: Date.now() + 30_000,
+    }
+    if (window.services?.deleteNote && !filePath.startsWith('demo://')) {
+      window.services.deleteNote(filePath)
+    }
+    demoStore.delete(filePath)
+    notes.value = notes.value.filter((n) => n.path !== filePath)
+    invalidateTaskCache(filePath)
+    status.value = '已删除，30 秒内可撤销'
+    if (activePath.value === filePath) {
+      activePath.value = ''
+      content.value = ''
+      dirty.value = false
+      undoStack.value = []
+      redoStack.value = []
+      if (notes.value[0]) await openNote(notes.value[0].path)
+    }
+  }
+
+  async function undoDeleteNote() {
+    const item = lastDeleted.value
+    if (!item || Date.now() > item.expires) {
+      status.value = '没有可撤销的删除'
+      lastDeleted.value = null
+      return
+    }
+    lastDeleted.value = null
+    if (item.path.startsWith('demo://') || !window.services?.writeNote) {
+      demoStore.set(item.path, item.content)
+      notes.value = sortNotesByMtime([
+        {
+          name: item.name,
+          path: item.path,
+          mtime: Date.now(),
+          size: item.content.length,
+          folder: item.folder,
+          kind: item.kind,
+        },
+        ...notes.value.filter((n) => n.path !== item.path),
+      ])
+      await openNote(item.path)
+      status.value = '已恢复删除的笔记'
+      return
+    }
+    // 写回原路径
+    window.services.writeNote(item.path, item.content)
+    await refreshNotes()
+    await openNote(item.path)
+    status.value = '已恢复删除的笔记'
+  }
+
+  async function changeNotesRoot(dirPath?: string | null) {
+    if (dirty.value) {
+      const ok = await flushSave()
+      if (!ok) {
+        status.value = '保存失败，请重试后再切换目录'
+        return
+      }
+    }
+    invalidateTaskCache()
+
+    let target = dirPath || null
+    if (!target && window.services?.chooseNotesRoot) {
+      target = window.services.chooseNotesRoot()
+      if (!target) return
+    } else if (!target && window.ztools?.showOpenDialog) {
+      const result = window.ztools.showOpenDialog({
+        title: '选择笔记目录',
+        defaultPath: notesRoot.value || undefined,
+        properties: ['openDirectory', 'createDirectory'],
+      })
+      if (!result || !result[0]) return
+      target = result[0]
+    } else if (!target) {
+      const input = await askPrompt({
+        title: '笔记目录',
+        message: '请输入本机笔记根目录路径（正式环境请用选择文件夹）。',
+        defaultValue: notesRoot.value || '',
+        placeholder: '例如 D:\\Notes',
+        confirmText: '切换',
+      })
+      if (!input) return
+      target = input
+    }
+
+    try {
+      if (window.services?.setNotesRoot) {
+        notesRoot.value = window.services.setNotesRoot(target)
+      } else {
+        notesRoot.value = target
+        notes.value = []
+      }
+      activePath.value = ''
+      content.value = ''
+      dirty.value = false
+      status.value = '已切换目录'
+      await refreshNotes()
+      settingsOpen.value = false
+    } catch (e) {
+      status.value = '切换目录失败'
+      console.error(e)
+    }
+  }
+
+  function openInFolder(filePath?: string) {
+    const target = filePath || activePath.value || notesRoot.value
+    if (!target || target.startsWith('demo://') || target === '(demo)') {
+      if (window.services?.openInFolder && notesRoot.value && notesRoot.value !== '(demo)') {
+        const ok = window.services.openInFolder(notesRoot.value)
+        status.value = ok ? '已在资源管理器打开' : '打开失败'
+        return
+      }
+      status.value = '演示模式无法打开文件夹'
+      return
+    }
+    if (!window.services?.openInFolder) {
+      status.value = '当前环境不支持打开文件夹'
+      return
+    }
+    const ok = window.services.openInFolder(target)
+    status.value = ok ? '已在资源管理器打开' : '打开失败'
+  }
+
+  function setView(v: AppView) {
+    view.value = v
+  }
+
+  function setEditorMode(m: EditorMode) {
+    editorMode.value = m
+  }
+
+  function setSettingsOpen(open: boolean) {
+    settingsOpen.value = open
+  }
+
+  function patchTask(task: Task, patch: TaskPatch) {
+    setContent(applyTaskPatch(content.value, task, patch))
+  }
+
+  function onToggleTask(taskId: string) {
+    setContent(toggleTaskDone(content.value, taskId))
+  }
+
+  function onScheduleChange(taskId: string, start?: string | null, end?: string | null) {
+    setContent(updateTaskSchedule(content.value, taskId, start, end))
+  }
+
+  /** 新任务只能写入用户明确选择的笔记与合法 Task Block，绝不隐式创建“今日计划”。 */
+  async function onAddTask(
+    input: {
+      title: string
+      date?: string
+      due?: string
+      start?: string
+      end?: string
+      type?: Task['type']
+      priority?: Task['priority']
+      color?: Task['color']
+      tags?: string[]
+    },
+    target?: { notePath?: string; blockId?: string }
+  ): Promise<boolean> {
+    const path = target?.notePath
+    const blockId = target?.blockId
+    if (!path || !blockId) {
+      status.value = '请选择目标笔记和 Task Block 后再新建任务'
+      return false
+    }
+    const append = (md: string) => appendTask(md, { ...input, blockId })
+    if (path === activePath.value) {
+      const next = append(content.value)
+      if (next === content.value) {
+        status.value = '目标 Task Block 不存在、不可写或任务日期无效'
+        return false
+      }
+      setContent(next)
+      return true
+    }
+    const before = readNoteMarkdown(path)
+    const next = append(before)
+    if (next === before) {
+      status.value = '目标 Task Block 不存在、不可写或任务日期无效'
+      return false
+    }
+    writeNoteMarkdown(path, next)
+    status.value = '已添加任务'
+    return true
+  }
+
+  function onRemoveTask(taskId: string) {
+    setContent(removeTask(content.value, taskId))
+  }
+
+  function onToggleGlobalTask(task: GlobalTask) {
+    applyToNote(task.notePath, (md) => toggleTaskDone(md, task.id))
+  }
+
+  function onScheduleGlobalTask(task: GlobalTask, start?: string | null, end?: string | null) {
+    applyToNote(task.notePath, (md) => updateTaskSchedule(md, task.id, start, end))
+  }
+
+  function patchGlobalTask(task: GlobalTask, patch: TaskPatch) {
+    applyToNote(task.notePath, (md) => applyTaskPatch(md, task, patch))
+  }
+
+  function onRemoveGlobalTask(task: GlobalTask) {
+    applyToNote(task.notePath, (md) => removeTask(md, task.id))
+  }
+
+  /** 打开源笔记并切到待办视图（便于定位） */
+  /** 打开源笔记；可选切到编辑视图便于改原文 */
+  async function openGlobalTask(task: GlobalTask, opts?: { view?: AppView }) {
+    if (task.notePath && task.notePath !== activePath.value) {
+      await openNote(task.notePath)
+    }
+    setView(opts?.view || 'editor')
+  }
+
+  return reactive({
+    notes,
+    folders,
+    noteGroups,
+    notesRoot,
+    activePath,
+    activeFolder,
+    content,
+    dirty,
+    view,
+    editorMode,
+    status,
+    saving,
+    saveError,
+    recentNotes,
+    settingsOpen,
+    syncProvider,
+    syncStatus,
+    defaultView,
+    defaultEditorMode,
+    lastDeleted,
+    canUndo: computed(() => undoStack.value.length > 0),
+    canRedo: computed(() => redoStack.value.length > 0),
+    collapsedFolders,
+    activeTaskDocument,
+    taskBlocks,
+    taskDiagnostics,
+    taskBlockTargets,
+    preferredTaskBlockId,
+    tasks,
+    scheduledTasks,
+    taskStats,
+    allTasks,
+    allTaskStats,
+    activeNote,
+    isEmptyWorkspace,
+    refreshNotes,
+    openNote,
+    setContent,
+    flushSave,
+    retrySave,
+    createNote,
+    createTodayPlan,
+    openSampleNote,
+    createFolder,
+    setActiveFolder,
+    toggleFolderCollapse,
+    isFolderCollapsed,
+    renameNote,
+    removeNote,
+    changeNotesRoot,
+    openInFolder,
+    setView,
+    setEditorMode,
+    setSettingsOpen,
+    setSyncProvider,
+    setDefaultView,
+    setDefaultEditorMode,
+    undoContent,
+    redoContent,
+    undoDeleteNote,
+    patchTask,
+    onToggleTask,
+    onScheduleChange,
+    onAddTask,
+    onRemoveTask,
+    onToggleGlobalTask,
+    onScheduleGlobalTask,
+    patchGlobalTask,
+    onRemoveGlobalTask,
+    openGlobalTask,
+    invalidateTaskCache,
+  })
+}
+
+function demoContent() {
+  return `# 快速开始
+
+这里可以写任意 Markdown。普通的 \`- [ ]\`、代码块和会议记录不会自动变成项目任务；只有显式 Task Block 中的条目会同步到待办、日历和甘特视图。
+
+- [ ] 这是一条普通清单，不会被任务工作台收录
+
+<!-- mdw:tasks id="release-plan" name="发布计划" color="violet" -->
+
+## 示例任务
+
+- [ ] 写产品需求 @id(requirements) @start(2026-07-20) @end(2026-07-24) @priority(high) #工作
+  - [ ] 整理评审材料 @id(review-kit) @due(2026-07-22) #协作
+- [ ] 发布里程碑 @id(release) @type(milestone) @date(2026-07-24) @color(green)
+
+<!-- /mdw:tasks -->
+
+## 记录
+
+任务的来源、层级、日期和颜色均保留在 Markdown 真源中。需要新建任务时，请先选择目标笔记和 Task Block。
+`
+}

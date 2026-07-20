@@ -1,0 +1,28 @@
+{
+  "name": "md-workspace",
+  "version": "0.7.2",
+  "description": "Markdown 工作台：本地笔记 + 显式待办语法驱动的待办/甘特投影",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build --config vite.ship.config.js",
+    "preview": "vite preview",
+    "test:core": "node --import tsx --test src/core/task.test.ts src/core/markdownBridge.test.ts src/core/globalTasks.test.ts",
+    "pack": "npm run build && node scripts/pack.mjs",
+    "pack:only": "node scripts/pack.mjs"
+  },
+  "dependencies": {
+    "marked": "^15.0.6",
+    "turndown": "^7.2.0",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@types/turndown": "^5.0.5",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@ztools-center/ztools-api-types": "^1.0.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.3.0",
+    "vite": "^6.0.11",
+    "vue-tsc": "^2.0.0"
+  }
+}
