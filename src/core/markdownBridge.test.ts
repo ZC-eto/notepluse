@@ -73,8 +73,9 @@ describe('markdownBridge toolbar', () => {
     assert.match(html, /data-mdw-task-boundary="close"/)
     assert.match(html, /data-mdw-source="&lt;!-- mdw:tasks id=&quot;round-trip&quot; name=&quot;Iteration&quot; color=&quot;violet&quot; --&gt;"/)
     assert.match(html, /data-mdw-source="&lt;!-- \/mdw:tasks --&gt;"/)
-    assert.match(html, /\u4efb\u52a1\u5757\u5f00\u59cb/)
-    assert.match(html, /\u4efb\u52a1\u5757\u7ed3\u675f/)
+    assert.match(html, /\u4efb\u52a1\u7ec4/)
+    assert.match(html, /\u7ed3\u675f/)
+    assert.doesNotMatch(html, /\u4efb\u52a1\u5757\u5f00\u59cb/)
   })
 
   it('keeps Task Block-looking comments inside fenced code as ordinary Markdown', () => {

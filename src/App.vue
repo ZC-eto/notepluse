@@ -12,6 +12,7 @@ import TodoView from './views/TodoView.vue'
 import GanttView from './views/GanttView.vue'
 import CalendarView from './views/CalendarView.vue'
 import MiniStickyView from './views/MiniStickyView.vue'
+import OnboardingTour from './components/OnboardingTour.vue'
 
 const isMiniMode =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'mini'
@@ -87,7 +88,12 @@ function extractFilePath(action: any): string | null {
 function selectView(view: AppView) {
   const enabled = ((ws as any).enabledViews as AppView[] | undefined) || allViewMeta.map((v) => v.id)
   if (!enabled.includes(view)) {
-    const fallback = enabled[0] || 'editor'
+    // 笔记可被关闭：仍允许「在源码中打开」类 force 路径；导航点击则落到已启用项
+    if (view === 'editor') {
+      ws.setView('editor' as AppView, { force: true } as any)
+      return
+    }
+    const fallback = enabled[0] || 'todo'
     ws.setView(fallback)
     return
   }
@@ -365,5 +371,6 @@ onBeforeUnmount(() => {
       @confirm="(v) => ui.resolvePrompt(v)"
       @cancel="ui.resolvePrompt(null)"
     />
+    <OnboardingTour />
   </div>
 </template>

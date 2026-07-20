@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, onBeforeUnmount } from 'vue'
 import type { useWorkspace } from '../composables/useWorkspace'
-import type { AppView, EditorMode, SyncProvider } from '../core/types'
+import type { AppView, EditorMode, SyncProvider, UiDensity } from '../core/types'
 import HelpTip from './HelpTip.vue'
 
 defineProps<{ open: boolean }>()
@@ -15,9 +15,10 @@ const defMode = computed(() => (ws.defaultEditorMode || 'wysiwyg') as EditorMode
 const enabled = computed(() => ((ws as any).enabledViews as AppView[]) || ['editor', 'todo', 'gantt', 'calendar'])
 const libraryDefaultOpen = computed(() => Boolean((ws as any).libraryDefaultOpen))
 const miniWindowEnabled = computed(() => Boolean((ws as any).miniWindowEnabled))
+const density = computed(() => ((ws as any).uiDensity as UiDensity) || 'compact')
 
-const viewToggles: { id: AppView; label: string; locked?: boolean }[] = [
-  { id: 'editor', label: '笔记', locked: true },
+const viewToggles: { id: AppView; label: string }[] = [
+  { id: 'editor', label: '笔记' },
   { id: 'todo', label: '待办' },
   { id: 'gantt', label: '甘特' },
   { id: 'calendar', label: '日历' },
@@ -63,7 +64,6 @@ function isViewOn(id: AppView) {
 }
 
 function toggleView(id: AppView) {
-  if (id === 'editor') return
   ;(ws as any).toggleEnabledView?.(id)
 }
 
@@ -77,6 +77,14 @@ function toggleMini(on: boolean) {
 
 function seedSamples() {
   void (ws as any).ensureDemoSamples?.()
+}
+
+function pickDensity(d: UiDensity) {
+  ;(ws as any).setUiDensity?.(d)
+}
+
+function restartTour() {
+  ;(ws as any).restartOnboarding?.()
 }
 
 onMounted(() => window.addEventListener('keydown', onKey))
@@ -124,26 +132,32 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           <section class="settings-block">
             <h3 class="settings-block-title">
               启用视图
-              <HelpTip text="关闭后左侧导航隐藏对应入口。笔记视图始终开启。" label="启用视图说明" />
+              <HelpTip
+                text="关闭后左侧导航隐藏对应入口。Markdown 文件始终是真源；即使关闭「笔记」入口，也可从任务「在源码中打开」临时进入编辑。"
+                label="启用视图说明"
+              />
             </h3>
             <div class="settings-toggle-grid">
               <label v-for="opt in viewToggles" :key="opt.id" class="settings-toggle">
                 <input
                   type="checkbox"
                   :checked="isViewOn(opt.id)"
-                  :disabled="opt.locked"
                   @change="toggleView(opt.id)"
                 />
                 <span>{{ opt.label }}</span>
               </label>
             </div>
+            <p class="settings-foot">至少保留一个视图。关闭不等于删除数据。</p>
           </section>
 
           <section class="settings-block">
-            <h3 class="settings-block-title">打开时默认</h3>
+            <h3 class="settings-block-title">
+              打开时默认
+              <HelpTip text="下次启动插件时优先显示的工作面。可与「启用视图」独立：默认可记笔记，即使你暂时关掉了笔记导航。" label="默认视图说明" />
+            </h3>
             <div class="settings-seg" role="group" aria-label="默认视图">
               <button
-                v-for="opt in viewOptions.filter((o) => isViewOn(o.id))"
+                v-for="opt in viewOptions"
                 :key="opt.id"
                 type="button"
                 class="seg-btn"
@@ -165,6 +179,49 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               <input type="checkbox" :checked="libraryDefaultOpen" @change="setLibraryOpen(($event.target as HTMLInputElement).checked)" />
               <span>启动时打开笔记库</span>
             </label>
+          </section>
+
+          <section class="settings-block">
+            <h3 class="settings-block-title">
+              显示密度
+              <HelpTip text="紧凑适合 ZTools 窄窗，一屏显示更多内容；舒适适合大屏长文阅读。" label="显示密度说明" />
+            </h3>
+            <div class="settings-seg" role="group" aria-label="显示密度">
+              <button type="button" class="seg-btn" :class="{ active: density === 'compact' }" @click="pickDensity('compact')">
+                紧凑
+              </button>
+              <button type="button" class="seg-btn" :class="{ active: density === 'comfortable' }" @click="pickDensity('comfortable')">
+                舒适
+              </button>
+            </div>
+          </section>
+
+          <section class="settings-block">
+            <h3 class="settings-block-title">
+              使用引导
+              <HelpTip text="第一次打开会弹出流程式引导。可随时跳过，也可在这里重新开始。" label="引导说明" />
+            </h3>
+            <div class="settings-actions">
+              <button type="button" class="btn-solid sm" @click="restartTour">重新开始引导</button>
+            </div>
+            <div class="settings-help-topics">
+              <details class="settings-help">
+                <summary>任务组是什么？</summary>
+                <p>用「任务组」按钮插入的 Markdown 注释块。只有块内的 <code>- [ ]</code> 会进入待办 / 日历 / 甘特。普通清单与代码示例不会被收录。</p>
+              </details>
+              <details class="settings-help">
+                <summary>日期如何进甘特 / 日历？</summary>
+                <p><code>@date</code> 单日、<code>@due</code> 截止、<code>@start</code>+<code>@end</code> 跨日执行、里程碑 <code>@type(milestone)</code>+<code>@date</code>。甘特只显示跨日与里程碑；单日与截止看日历或待办。</p>
+              </details>
+              <details class="settings-help">
+                <summary>排版模式里的「任务组 / 结束」</summary>
+                <p>是任务组边界标记，保证切换排版/源码时不丢注释。完整注释在源码模式可见；悬停标记可看原文。</p>
+              </details>
+              <details class="settings-help">
+                <summary>顶栏「N 个问题」怎么办？</summary>
+                <p>点「查看」会切到源码并定位到出错行。常见原因：任务组未闭合、嵌套、重复 id、日期写反。修好保存后诊断会消失。</p>
+              </details>
+            </div>
           </section>
 
           <section class="settings-block">

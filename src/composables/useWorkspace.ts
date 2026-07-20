@@ -9,6 +9,7 @@ import type {
   NoteMeta,
   SyncProvider,
   TaskBlockTarget,
+  UiDensity,
 } from '../core/types'
 import { parseScheduledTasks, parseTasks, countTasks, parseTaskDocument } from '../core/parseTasks'
 import {
@@ -50,12 +51,18 @@ const saveError = ref('')
 const recentPaths = ref<string[]>([])
 const settingsOpen = ref(false)
 const syncProvider = ref<SyncProvider>(DEFAULT_SYNC_PROVIDER)
-const defaultView = ref<AppView>('todo')
+const defaultView = ref<AppView>('editor')
 const defaultEditorMode = ref<EditorMode>('wysiwyg')
-/** 设置：启用的工作视图 */
+/** 设置：启用的工作视图（均可关闭；至少保留一个入口） */
 const enabledViews = ref<AppView[]>(['editor', 'todo', 'gantt', 'calendar'])
 /** 设置：进入时是否默认打开笔记库 */
 const libraryDefaultOpen = ref(false)
+/** 界面密度：默认紧凑，适配 ZTools 窄窗 */
+const uiDensity = ref<UiDensity>('compact')
+/** 首次引导是否已完成（可设置里重开） */
+const onboardingCompleted = ref(false)
+/** 当前会话是否显示引导层 */
+const onboardingOpen = ref(false)
 /** 桌面小窗偏好（宿主 createBrowserWindow） */
 const miniWindowEnabled = ref(false)
 let miniWindowRef: any = null
@@ -86,6 +93,15 @@ function isAppView(v: unknown): v is AppView {
 
 function isEditorMode(v: unknown): v is EditorMode {
   return v === 'wysiwyg' || v === 'source'
+}
+
+function isUiDensity(v: unknown): v is UiDensity {
+  return v === 'comfortable' || v === 'compact'
+}
+
+function applyDensityToDom(density: UiDensity) {
+  if (typeof document === 'undefined') return
+  document.documentElement.setAttribute('data-density', density)
 }
 
 function writeUserConfig(partial: Record<string, unknown>) {
@@ -234,39 +250,65 @@ export function useWorkspace() {
 
   function loadUiPrefs() {
     try {
-      const cfg = (window.services?.readConfig?.() || {}) as Record<string, unknown>
+      let cfg = (window.services?.readConfig?.() || {}) as Record<string, unknown>
+      if (!window.services?.readConfig) {
+        try {
+          const raw = localStorage.getItem('mdw-ui-prefs')
+          if (raw) cfg = { ...cfg, ...(JSON.parse(raw) as Record<string, unknown>) }
+        } catch {}
+      }
       if (isAppView(cfg.defaultView)) defaultView.value = cfg.defaultView
       if (isEditorMode(cfg.defaultEditorMode)) defaultEditorMode.value = cfg.defaultEditorMode
       if (Array.isArray(cfg.enabledViews)) {
         const next = (cfg.enabledViews as unknown[]).filter(isAppView) as AppView[]
-        if (next.length) enabledViews.value = next.includes('editor') ? next : (['editor', ...next] as AppView[])
+        if (next.length) enabledViews.value = Array.from(new Set(next))
       }
       if (typeof cfg.libraryDefaultOpen === 'boolean') libraryDefaultOpen.value = cfg.libraryDefaultOpen
       if (typeof cfg.miniWindowEnabled === 'boolean') miniWindowEnabled.value = cfg.miniWindowEnabled
+      if (isUiDensity(cfg.uiDensity)) uiDensity.value = cfg.uiDensity
+      if (typeof cfg.onboardingCompleted === 'boolean') onboardingCompleted.value = cfg.onboardingCompleted
+      applyDensityToDom(uiDensity.value)
       if (!prefsApplied) {
         view.value = defaultView.value
-        if (!enabledViews.value.includes(view.value)) view.value = enabledViews.value[0] || 'editor'
+        if (!enabledViews.value.includes(view.value)) {
+          view.value = enabledViews.value[0] || 'editor'
+        }
         editorMode.value = defaultEditorMode.value
         prefsApplied = true
+        if (!onboardingCompleted.value) onboardingOpen.value = true
       }
-    } catch {}
+    } catch {
+      applyDensityToDom(uiDensity.value)
+    }
   }
 
   function persistUiPrefs() {
-    if (!window.services?.writeConfig) return
-    window.services.writeConfig({
+    const payload = {
       defaultView: defaultView.value,
       defaultEditorMode: defaultEditorMode.value,
       enabledViews: enabledViews.value.slice(),
       libraryDefaultOpen: libraryDefaultOpen.value,
       miniWindowEnabled: miniWindowEnabled.value,
-    })
+      uiDensity: uiDensity.value,
+      onboardingCompleted: onboardingCompleted.value,
+    }
+    if (window.services?.writeConfig) {
+      window.services.writeConfig(payload)
+      return
+    }
+    try {
+      localStorage.setItem('mdw-ui-prefs', JSON.stringify(payload))
+    } catch {}
   }
 
   function setDefaultView(v: AppView) {
     if (!isAppView(v)) return
     defaultView.value = v
     if (enabledViews.value.includes(v)) view.value = v
+    else if (!enabledViews.value.includes(defaultView.value) && enabledViews.value[0]) {
+      // 默认视图未启用时，启动仍记用户选择；当前会话落到已启用项
+      view.value = enabledViews.value[0]
+    }
     persistUiPrefs()
     status.value = '已保存默认视图'
   }
@@ -281,26 +323,69 @@ export function useWorkspace() {
 
   function setEnabledViews(list: AppView[]) {
     const next = (list || []).filter(isAppView)
-    // 笔记视图始终保留，避免无入口
-    const uniq = Array.from(new Set<AppView>(['editor', ...next]))
+    const uniq = Array.from(new Set<AppView>(next))
+    // 至少保留一个导航入口；Markdown 真源不依赖视图开关
+    if (!uniq.length) {
+      status.value = '请至少保留一个工作视图'
+      return
+    }
     enabledViews.value = uniq
     if (!uniq.includes(view.value)) view.value = uniq[0]
-    if (!uniq.includes(defaultView.value)) defaultView.value = uniq[0]
+    // 默认视图可指向已关闭项（下次开启仍记得）；当前会话不会落到关闭项
     persistUiPrefs()
     status.value = '已更新启用视图'
   }
 
   function toggleEnabledView(v: AppView) {
-    if (v === 'editor') return
+    if (!isAppView(v)) return
     const set = new Set(enabledViews.value)
-    if (set.has(v)) set.delete(v)
-    else set.add(v)
+    if (set.has(v)) {
+      if (set.size <= 1) {
+        status.value = '请至少保留一个工作视图'
+        return
+      }
+      set.delete(v)
+    } else {
+      set.add(v)
+    }
     setEnabledViews(Array.from(set))
   }
 
   function setLibraryDefaultOpen(on: boolean) {
     libraryDefaultOpen.value = !!on
     persistUiPrefs()
+  }
+
+  function setUiDensity(d: UiDensity) {
+    if (!isUiDensity(d)) return
+    uiDensity.value = d
+    applyDensityToDom(d)
+    persistUiPrefs()
+    status.value = d === 'compact' ? '已切换为紧凑显示' : '已切换为舒适显示'
+  }
+
+  function completeOnboarding() {
+    onboardingCompleted.value = true
+    onboardingOpen.value = false
+    persistUiPrefs()
+    status.value = '已完成引导'
+  }
+
+  function skipOnboarding() {
+    completeOnboarding()
+    status.value = '已跳过引导'
+  }
+
+  function restartOnboarding() {
+    onboardingCompleted.value = false
+    onboardingOpen.value = true
+    settingsOpen.value = false
+    persistUiPrefs()
+    status.value = '已重新开始引导'
+  }
+
+  function dismissOnboardingSession() {
+    onboardingOpen.value = false
   }
 
   async function ensureDemoSamples() {
@@ -1332,7 +1417,19 @@ export function useWorkspace() {
     status.value = ok ? '已在资源管理器打开' : '打开失败'
   }
 
-  function setView(v: AppView) {
+  function setView(v: AppView, opts?: { force?: boolean }) {
+    if (!isAppView(v)) return
+    if (!opts?.force && !enabledViews.value.includes(v)) {
+      const fallback = enabledViews.value[0]
+      if (fallback) view.value = fallback
+      return
+    }
+    // force：从任务「在源码中打开」等路径临时进入笔记，即使导航关闭
+    if (opts?.force && !enabledViews.value.includes(v) && v === 'editor') {
+      view.value = v
+      return
+    }
+    if (!enabledViews.value.includes(v) && !opts?.force) return
     view.value = v
   }
 
@@ -1424,7 +1521,8 @@ export function useWorkspace() {
     if (task.notePath && task.notePath !== activePath.value) {
       await openNote(task.notePath)
     }
-    setView(opts?.view || 'editor')
+    const target = opts?.view || 'editor'
+    setView(target, { force: target === 'editor' })
   }
 
   return reactive({
@@ -1449,6 +1547,9 @@ export function useWorkspace() {
     defaultEditorMode,
     enabledViews,
     libraryDefaultOpen,
+    uiDensity,
+    onboardingCompleted,
+    onboardingOpen,
     miniWindowEnabled,
     lastDeleted,
     canUndo: computed(() => undoStack.value.length > 0),
@@ -1491,6 +1592,11 @@ export function useWorkspace() {
     setEnabledViews,
     toggleEnabledView,
     setLibraryDefaultOpen,
+    setUiDensity,
+    completeOnboarding,
+    skipOnboarding,
+    restartOnboarding,
+    dismissOnboardingSession,
     openMiniWindow,
     closeMiniWindow,
     toggleMiniWindow,

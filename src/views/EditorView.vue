@@ -278,7 +278,8 @@ async function insertTaskBlock() {
   const blockId = `tasks-${newTaskId()}`
   const taskId = newTaskId()
   const taskTitle = '待办事项'
-  const block = `<!-- mdw:tasks id="${blockId}" name="任务组" color="blue" -->\n\n## ${taskTitle}\n- [ ] ${taskTitle} @id(${taskId})\n\n<!-- /mdw:tasks -->`
+  // 标题与任务分行：避免 WYSIWYG 把 heading 与 task 混排后露出裸 @id
+  const block = `<!-- mdw:tasks id="${blockId}" name="任务组" color="blue" -->\n\n- [ ] ${taskTitle} @id(${taskId})\n\n<!-- /mdw:tasks -->`
   const before = current.slice(0, start)
   const after = current.slice(end)
   const prefix = before && !before.endsWith('\n') ? '\n\n' : before && !before.endsWith('\n\n') ? '\n' : ''

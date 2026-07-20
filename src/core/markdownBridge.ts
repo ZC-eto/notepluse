@@ -540,9 +540,10 @@ export function markdownToEditableHtml(markdown: string): string {
     // modes cannot silently turn projected tasks back into ordinary checkboxes.
     if (opensTaskBlock || closesTaskBlock) {
       flushBuffer()
+      // \u6807\u7b7e\u4fdd\u6301\u6781\u77ed\uff1a\u907f\u514d\u6392\u7248\u9762\u88ab\u300c\u4efb\u52a1\u5757\u5f00\u59cb/\u7ed3\u675f\u300d\u957f\u6587\u6848\u6df9\u6ca1\uff1b\u5b8c\u6574\u6ce8\u91ca\u5728 data-mdw-source\u3002
       out.push(
-        `<div class="task-block-boundary" contenteditable="false" data-mdw-task-boundary="${opensTaskBlock ? 'open' : 'close'}" data-mdw-source="${escapeHtml(line)}">` +
-          `<span class="task-block-boundary-label">${opensTaskBlock ? '\u4efb\u52a1\u5757\u5f00\u59cb' : '\u4efb\u52a1\u5757\u7ed3\u675f'}</span>` +
+        `<div class="task-block-boundary" contenteditable="false" data-mdw-task-boundary="${opensTaskBlock ? 'open' : 'close'}" data-mdw-source="${escapeHtml(line)}" title="${escapeHtml(line)}">` +
+          `<span class="task-block-boundary-label">${opensTaskBlock ? '\u4efb\u52a1\u7ec4' : '\u7ed3\u675f'}</span>` +
         `</div>`
       )
       if (opensTaskBlock) taskBlockDepth += 1

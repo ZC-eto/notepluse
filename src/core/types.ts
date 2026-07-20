@@ -143,3 +143,5 @@ export type SyncProvider = 'local' | 'webdiv'
 
 export type AppView = 'editor' | 'todo' | 'gantt' | 'calendar'
 export type EditorMode = 'wysiwyg' | 'source'
+/** 界面信息密度：紧凑适合宿主窄窗 */
+export type UiDensity = 'comfortable' | 'compact'

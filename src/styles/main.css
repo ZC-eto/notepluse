@@ -4395,3 +4395,213 @@ html.mini-mode body {
   outline: 2px solid color-mix(in srgb, var(--workline, var(--accent)) 70%, white);
   outline-offset: 1px;
 }
+
+
+/* ========================================================================== */
+/* v0.8.0 — density + onboarding + quieter task-block markers                */
+/* ========================================================================== */
+
+html[data-density='compact'] {
+  --mdw-ui-scale: 0.92;
+}
+
+html[data-density='comfortable'] {
+  --mdw-ui-scale: 1;
+}
+
+html[data-density='compact'] body {
+  font-size: 13px;
+}
+
+html[data-density='compact'] .topbar {
+  min-height: 42px;
+}
+
+html[data-density='compact'] .wysiwyg-editor.md-body,
+html[data-density='compact'] .md-body {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+html[data-density='compact'] .md-body h1,
+html[data-density='compact'] .wysiwyg-editor h1 {
+  font-size: 1.35em;
+  margin: 0.55em 0 0.35em;
+}
+
+html[data-density='compact'] .md-body h2,
+html[data-density='compact'] .wysiwyg-editor h2 {
+  font-size: 1.18em;
+  margin: 0.7em 0 0.3em;
+}
+
+html[data-density='compact'] .md-body h3,
+html[data-density='compact'] .wysiwyg-editor h3 {
+  font-size: 1.05em;
+}
+
+html[data-density='compact'] .md-body p,
+html[data-density='compact'] .wysiwyg-editor p {
+  margin: 0.4em 0;
+}
+
+html[data-density='compact'] .editor-tool-btn,
+html[data-density='compact'] .rail-label {
+  font-size: 12px;
+}
+
+html[data-density='compact'] .task-block-status {
+  padding: 4px 10px;
+  font-size: 11.5px;
+}
+
+html[data-density='compact'] .wysiwyg-editor .task-item,
+html[data-density='compact'] .md-body .task-item {
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+}
+
+html[data-density='compact'] .wysiwyg-editor .task-block-boundary,
+html[data-density='compact'] .md-body .task-block-boundary {
+  min-height: 18px !important;
+  margin: 8px 0 4px !important;
+  padding: 0 0 0 8px !important;
+}
+
+/* Quiet boundary: thin workline + short label (not a full-width empty zone) */
+.wysiwyg-editor .task-block-boundary,
+.md-body .task-block-boundary {
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  gap: 8px;
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 20px !important;
+  margin: 10px 0 4px !important;
+  padding: 0 0 0 10px !important;
+  border: 0 !important;
+  border-left: 2px solid color-mix(in srgb, var(--workline, var(--accent)) 72%, var(--line)) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  opacity: 0.85;
+}
+
+.wysiwyg-editor .task-block-boundary[data-mdw-task-boundary='close'],
+.md-body .task-block-boundary[data-mdw-task-boundary='close'] {
+  margin-top: 4px !important;
+  margin-bottom: 12px !important;
+  opacity: 0.55;
+}
+
+.wysiwyg-editor .task-block-boundary-label,
+.md-body .task-block-boundary-label {
+  font-size: 10px !important;
+  font-weight: 650 !important;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--faint) !important;
+  font-family: var(--mono) !important;
+}
+
+/* Onboarding spotlight */
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: end center;
+  padding: 24px 16px 28px;
+  pointer-events: auto;
+}
+
+.onboarding-scrim {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, #0b100e 52%, transparent);
+  backdrop-filter: blur(1.5px);
+}
+
+.onboarding-card {
+  position: relative;
+  z-index: 1;
+  width: min(440px, 100%);
+  padding: 16px 18px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.onboarding-head {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.onboarding-progress {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.onboarding-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.onboarding-body {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.onboarding-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.onboarding-nav {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.settings-help-topics {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.settings-help {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+
+.settings-help summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.settings-help p {
+  margin: 6px 0 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.settings-help code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+}
