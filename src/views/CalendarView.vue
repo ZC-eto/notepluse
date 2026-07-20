@@ -13,7 +13,7 @@ const ws = inject('workspace') as ReturnType<typeof useWorkspace>
 const calendarHelpText = '○ 单日、⌄ 截止、— 执行区间 与 ◆ 里程碑 分别显示；截止日不会被当作执行条。单日、截止、执行区间和里程碑分别呈现；截止不是执行结束日期。'
 const calendarEmptyHelpText = '此范围内没有可投影的日期任务。普通 Markdown checklist 不会进入日历。'
 const calendarDayEmptyHelpText = '这一天没有来自合法 Task Block 的日程。'
-const calendarWriteHelpText = '当前工作区没有合法 Task Block；请在源码模式创建显式 mdw:tasks 容器后再新建任务。'
+const calendarWriteHelpText = '当前工作区没有合法 Task Block；请在源码模式创建合法任务组后再新建任务。'
 const cursor = ref(new Date())
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日']
 const scope = ref<'current' | 'all'>('current')
@@ -35,12 +35,12 @@ interface CalendarEvent {
 }
 
 const COLOR_HEX: Record<string, string> = {
-  gray: '#667085',
-  blue: '#3978f6',
-  green: '#268a5b',
-  orange: '#d97706',
-  red: '#cf3e4b',
-  violet: '#7c5ce4',
+  gray: 'var(--task-gray)',
+  blue: 'var(--task-blue)',
+  green: 'var(--task-green)',
+  orange: 'var(--task-orange)',
+  red: 'var(--task-red)',
+  violet: 'var(--task-violet)',
 }
 
 function isLocalDate(value?: string | null): value is string {
@@ -399,7 +399,7 @@ function eventDateSummary(event: CalendarEvent) {
           @keyup.esc="cancelAdd"
         />
         <select v-model="composeTargetKey" class="date-input" :disabled="!hasTargets" aria-label="新任务写入目标">
-          <option value="" disabled>选择笔记与 Task Block</option>
+          <option value="" disabled>选择笔记与任务组</option>
           <option v-for="target in taskBlockTargets" :key="targetKey(target)" :value="targetKey(target)">
             {{ target.folder ? `${target.folder} / ` : '' }}{{ target.noteName }} · {{ target.blockName }}
           </option>
@@ -408,7 +408,7 @@ function eventDateSummary(event: CalendarEvent) {
       </div>
       <div class="composer-inline-help">
         <HelpTip
-          :text="hasTargets ? ('将写入所选 Task Block：- [ ] 标题 @date(' + composeDay + ')') : calendarWriteHelpText"
+          :text="hasTargets ? ('将写入所选任务组：- [ ] 标题 @date(' + composeDay + ')') : calendarWriteHelpText"
           label="写入说明"
         />
         <span v-if="hasTargets">写入 @date({{ composeDay }})</span>

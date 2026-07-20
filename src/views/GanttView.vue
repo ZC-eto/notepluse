@@ -39,12 +39,12 @@ interface DragState {
 }
 
 const COLOR_HEX: Record<string, string> = {
-  gray: '#667085',
-  blue: '#3978f6',
-  green: '#268a5b',
-  orange: '#d97706',
-  red: '#cf3e4b',
-  violet: '#7c5ce4',
+  gray: 'var(--task-gray)',
+  blue: 'var(--task-blue)',
+  green: 'var(--task-green)',
+  orange: 'var(--task-orange)',
+  red: 'var(--task-red)',
+  violet: 'var(--task-violet)',
 }
 
 const drag = ref<DragState | null>(null)
@@ -116,9 +116,9 @@ const selectedEntry = computed(() => scheduledTasks.value.find((entry) => rowId(
 
 const ganttHelpText = '仅显示合法的跨日 @start + @end 执行区间和 @type(milestone) + @date；单日、截止和无日期任务不会伪装成进度条。选中任务后可在详情或日期栏中键盘编辑，不依赖拖拽。'
 const ganttEmptyHelpText = '请创建跨日执行区间，或在源码中定义带 @date 的里程碑。截止日期不属于甘特条。'
-const ganttWriteHelpText = '没有合法 Task Block 可写入；请在源码模式先创建显式任务块。'
+const ganttWriteHelpText = '没有可写的任务组；请在源码模式先创建合法任务组。'
 const taskBlockHowToText =
-  '在 Markdown 源码中用 HTML 注释包裹任务清单，例如：<!-- mdw:tasks id="sprint" name="迭代" color="violet" --> … - [ ] 事项 @start(2026-07-20) @end(2026-07-24) … <!-- /mdw:tasks -->。甘特仅投影块内合法区间与里程碑。'
+  '在 Markdown 源码中用 HTML 注释包裹任务清单，例如：<!-- mdw:tasks id="sprint" name="迭代" color="violet" --> … - [ ] 事项 @start(2026-07-20) @end(2026-07-24) … <!-- /mdw:tasks -->。甘特仅投影任务组内合法区间与里程碑。'
 const excludedHelpText = computed(() =>
   excludedCount.value
     ? `已有 ${excludedCount.value} 条带日期任务未进入甘特：它们是单日/截止任务、缺少完整区间，或日期无效。请在日历或源码中查看。`
