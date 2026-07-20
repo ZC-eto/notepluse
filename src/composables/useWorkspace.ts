@@ -52,6 +52,13 @@ const settingsOpen = ref(false)
 const syncProvider = ref<SyncProvider>(DEFAULT_SYNC_PROVIDER)
 const defaultView = ref<AppView>('todo')
 const defaultEditorMode = ref<EditorMode>('wysiwyg')
+/** 设置：启用的工作视图 */
+const enabledViews = ref<AppView[]>(['editor', 'todo', 'gantt', 'calendar'])
+/** 设置：进入时是否默认打开笔记库 */
+const libraryDefaultOpen = ref(false)
+/** 桌面小窗偏好（宿主 createBrowserWindow） */
+const miniWindowEnabled = ref(false)
+let miniWindowRef: any = null
 /** 内容撤销栈（源码级可靠） */
 const undoStack = ref<string[]>([])
 const redoStack = ref<string[]>([])
@@ -218,8 +225,15 @@ export function useWorkspace() {
       const cfg = (window.services?.readConfig?.() || {}) as Record<string, unknown>
       if (isAppView(cfg.defaultView)) defaultView.value = cfg.defaultView
       if (isEditorMode(cfg.defaultEditorMode)) defaultEditorMode.value = cfg.defaultEditorMode
+      if (Array.isArray(cfg.enabledViews)) {
+        const next = (cfg.enabledViews as unknown[]).filter(isAppView) as AppView[]
+        if (next.length) enabledViews.value = next.includes('editor') ? next : (['editor', ...next] as AppView[])
+      }
+      if (typeof cfg.libraryDefaultOpen === 'boolean') libraryDefaultOpen.value = cfg.libraryDefaultOpen
+      if (typeof cfg.miniWindowEnabled === 'boolean') miniWindowEnabled.value = cfg.miniWindowEnabled
       if (!prefsApplied) {
         view.value = defaultView.value
+        if (!enabledViews.value.includes(view.value)) view.value = enabledViews.value[0] || 'editor'
         editorMode.value = defaultEditorMode.value
         prefsApplied = true
       }
@@ -231,13 +245,16 @@ export function useWorkspace() {
     window.services.writeConfig({
       defaultView: defaultView.value,
       defaultEditorMode: defaultEditorMode.value,
+      enabledViews: enabledViews.value.slice(),
+      libraryDefaultOpen: libraryDefaultOpen.value,
+      miniWindowEnabled: miniWindowEnabled.value,
     })
   }
 
   function setDefaultView(v: AppView) {
     if (!isAppView(v)) return
     defaultView.value = v
-    view.value = v
+    if (enabledViews.value.includes(v)) view.value = v
     persistUiPrefs()
     status.value = '已保存默认视图'
   }
@@ -248,6 +265,116 @@ export function useWorkspace() {
     editorMode.value = m
     persistUiPrefs()
     status.value = '已保存默认编辑模式'
+  }
+
+  function setEnabledViews(list: AppView[]) {
+    const next = (list || []).filter(isAppView)
+    // 笔记视图始终保留，避免无入口
+    const uniq = Array.from(new Set<AppView>(['editor', ...next]))
+    enabledViews.value = uniq
+    if (!uniq.includes(view.value)) view.value = uniq[0]
+    if (!uniq.includes(defaultView.value)) defaultView.value = uniq[0]
+    persistUiPrefs()
+    status.value = '已更新启用视图'
+  }
+
+  function toggleEnabledView(v: AppView) {
+    if (v === 'editor') return
+    const set = new Set(enabledViews.value)
+    if (set.has(v)) set.delete(v)
+    else set.add(v)
+    setEnabledViews(Array.from(set))
+  }
+
+  function setLibraryDefaultOpen(on: boolean) {
+    libraryDefaultOpen.value = !!on
+    persistUiPrefs()
+  }
+
+  async function ensureDemoSamples() {
+    try {
+      const hasSample = notes.value.some(
+        (n) =>
+          n.name === '示例-待办甘特.md' ||
+          n.path.endsWith('/示例-待办甘特.md') ||
+          n.path.endsWith('\\示例-待办甘特.md')
+      )
+      if (hasSample) {
+        status.value = '示例笔记已存在'
+        return
+      }
+      // 先确保多级目录
+      if (window.services?.createFolder) {
+        try {
+          ;(window.services as any).createFolder('示例', '工作')
+        } catch {
+          /* ignore */
+        }
+      }
+      await createNote('工作/示例', { title: '示例-待办甘特', body: demoContent() })
+      status.value = '已创建示例笔记'
+    } catch (e) {
+      console.warn(e)
+      status.value = '创建示例失败'
+    }
+  }
+
+  function openMiniWindow() {
+    try {
+      if (typeof window.ztools?.createBrowserWindow !== 'function') {
+        status.value = '当前宿主不支持桌面小窗'
+        return
+      }
+      if (miniWindowRef && typeof miniWindowRef.focus === 'function') {
+        try {
+          miniWindowRef.focus()
+          return
+        } catch {
+          miniWindowRef = null
+        }
+      }
+      // 相对当前插件页面打开同一入口，便于操作而不只是展示
+      const url = './index.html?mode=mini'
+      miniWindowRef = window.ztools.createBrowserWindow(
+        url,
+        {
+          width: 420,
+          height: 640,
+          resizable: true,
+          title: '墨线 · 小窗',
+          alwayOnTop: true,
+          webPreferences: {
+            zoomFactor: 1,
+          },
+        },
+        () => {
+          /* ready */
+        }
+      )
+      miniWindowEnabled.value = true
+      persistUiPrefs()
+      status.value = '已打开桌面小窗'
+    } catch (e) {
+      console.warn('[md-workspace] openMiniWindow failed', e)
+      status.value = '打开小窗失败'
+    }
+  }
+
+  function closeMiniWindow() {
+    try {
+      if (miniWindowRef && typeof miniWindowRef.close === 'function') miniWindowRef.close()
+    } catch {
+      /* ignore */
+    }
+    miniWindowRef = null
+    miniWindowEnabled.value = false
+    persistUiPrefs()
+  }
+
+  function toggleMiniWindow(on?: boolean) {
+    const next = typeof on === 'boolean' ? on : !miniWindowEnabled.value
+    if (next) openMiniWindow()
+    else closeMiniWindow()
   }
 
   function pushUndoSnapshot(prev: string) {
@@ -758,7 +885,9 @@ export function useWorkspace() {
    * @param folder 目标文件夹相对路径；省略时用当前 activeFolder
    */
   async function createNote(folder?: string, options?: { title?: string; body?: string }) {
-    const targetFolder = folder !== undefined ? folder : activeFolder.value || ''
+    let targetFolder = folder !== undefined ? folder : activeFolder.value || ''
+    // 兼容「工作/示例」这类把路径误塞进 title 的调用：若 options 里无 title 且 folder 含 /
+    // 仍按 folder 建目录
     const kind = folderKindOf(targetFolder)
     const date = todayIso()
     const title = options?.title || (kind === 'record' ? `记录-${date}` : `笔记-${date}`)
@@ -848,34 +977,39 @@ export function useWorkspace() {
     status.value = '已创建示例笔记'
   }
 
-  async function createFolder(name?: string) {
-    const raw = name || (await askPrompt({
-      title: '新建文件夹',
-      message: '用于区分个人 / 工作 / 今日待办 / 长期待办 / 记录等。',
-      placeholder: '例如：个人 · 工作 · 项目A',
-      confirmText: '创建',
-    }))
+  async function createFolder(name?: string, parentFolder?: string) {
+    const parent = parentFolder !== undefined ? parentFolder : activeFolder.value || ''
+    const raw =
+      name ||
+      (await askPrompt({
+        title: parent ? '新建子文件夹' : '新建文件夹',
+        message: parent
+          ? `在「${parent}」下新建子文件夹。也可用 父/子 路径一次建多级。`
+          : '支持多级路径，例如：工作/项目A',
+        placeholder: parent ? '子文件夹名' : '例如：个人 · 工作/项目A',
+        confirmText: '创建',
+      }))
     if (!raw) return
-    const safe = String(raw)
-      .replace(/[\\/:*?"<>|]/g, '_')
-      .replace(/\s+/g, ' ')
-      .trim()
-    if (!safe) return
+    const input = String(raw).replace(/\\/g, '/').trim()
+    if (!input) return
 
     if (!window.services?.createFolder) {
-      if (!folders.value.find((f) => f.path === safe)) {
+      const rel = [parent, ...input.split('/').map((s) => s.trim()).filter(Boolean)]
+        .filter(Boolean)
+        .join('/')
+      if (!folders.value.find((f) => f.path === rel)) {
         folders.value = ensureFolderList([
           ...folders.value,
-          { name: safe, path: safe, kind: folderKindOf(safe) },
+          { name: rel.split('/').pop() || rel, path: rel, kind: folderKindOf(rel) },
         ])
       }
-      activeFolder.value = safe
+      activeFolder.value = rel
       status.value = '已新建文件夹（演示）'
       return
     }
 
     try {
-      const folder = window.services.createFolder(safe)
+      const folder = (window.services as any).createFolder(input, parent)
       activeFolder.value = folder.path
       status.value = folder.existed ? '文件夹已存在' : '已新建文件夹'
       await refreshNotes()
@@ -1192,6 +1326,9 @@ export function useWorkspace() {
     syncStatus,
     defaultView,
     defaultEditorMode,
+    enabledViews,
+    libraryDefaultOpen,
+    miniWindowEnabled,
     lastDeleted,
     canUndo: computed(() => undoStack.value.length > 0),
     canRedo: computed(() => redoStack.value.length > 0),
@@ -1230,6 +1367,13 @@ export function useWorkspace() {
     setSyncProvider,
     setDefaultView,
     setDefaultEditorMode,
+    setEnabledViews,
+    toggleEnabledView,
+    setLibraryDefaultOpen,
+    openMiniWindow,
+    closeMiniWindow,
+    toggleMiniWindow,
+    ensureDemoSamples,
     undoContent,
     redoContent,
     undoDeleteNote,

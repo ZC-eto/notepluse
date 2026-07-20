@@ -16,11 +16,11 @@ const ws = useWorkspace()
 provide('workspace', ws)
 
 const ui = useUiDialogState()
-/** 默认打开笔记库：插件窗体偏窄时也要能看到多笔记列表 */
-const libraryOpen = ref(true)
+/** 默认收起：写正文时不抢空间；需要时点「笔记库」打开 */
+const libraryOpen = ref(false)
 const mobileLibraryToggle = ref<HTMLButtonElement | null>(null)
 
-const viewMeta: {
+const allViewMeta: {
   id: AppView
   label: string
   title: string
@@ -32,8 +32,18 @@ const viewMeta: {
   { id: 'calendar', label: '日历', title: '日历（Ctrl+4）', icon: 'calendar' },
 ]
 
+const viewMeta = computed(() => {
+  const enabled = ((ws as any).enabledViews as AppView[] | undefined) || [
+    'editor',
+    'todo',
+    'gantt',
+    'calendar',
+  ]
+  return allViewMeta.filter((v) => enabled.includes(v.id))
+})
+
 const viewLabels = computed(() =>
-  Object.fromEntries(viewMeta.map((v) => [v.id, v.label])) as Record<AppView, string>
+  Object.fromEntries(allViewMeta.map((v) => [v.id, v.label])) as Record<AppView, string>
 )
 
 const workspaceState = computed(() => {
@@ -67,9 +77,14 @@ function extractFilePath(action: any): string | null {
 }
 
 function selectView(view: AppView) {
+  const enabled = ((ws as any).enabledViews as AppView[] | undefined) || allViewMeta.map((v) => v.id)
+  if (!enabled.includes(view)) {
+    const fallback = enabled[0] || 'editor'
+    ws.setView(fallback)
+    return
+  }
   ws.setView(view)
-  // 切到笔记视图时自动展开笔记库，避免“找不到其它笔记”
-  if (view === 'editor') libraryOpen.value = true
+  // 不再自动弹出笔记库，避免挡住正文
 }
 
 function viewShortcut(view: AppView) {
@@ -214,8 +229,8 @@ onMounted(async () => {
   await ws.refreshNotes()
   if ((ws as any).defaultView) ws.setView((ws as any).defaultView)
   if ((ws as any).defaultEditorMode) ws.setEditorMode((ws as any).defaultEditorMode)
-  // 进入后始终可见笔记库（多笔记浏览核心路径）
-  libraryOpen.value = true
+  // 默认收起侧栏；若设置要求默认打开再展开
+  libraryOpen.value = Boolean((ws as any).libraryDefaultOpen)
   window.addEventListener('keydown', onKeydown)
 
   if (window.ztools?.onPluginEnter) {
@@ -299,21 +314,13 @@ onBeforeUnmount(() => {
         <CalendarView v-else />
       </div>
       <footer
-        v-if="workspaceState || ws.view !== 'editor'"
+        v-if="workspaceState"
         class="workspace-status"
         aria-live="polite"
       >
         <span class="status-workline" aria-hidden="true" />
         <span class="workspace-status-label">{{ viewLabels[ws.view] }}</span>
-        <span v-if="workspaceState" class="workspace-status-copy">{{ workspaceState }}</span>
-        <button
-          type="button"
-          class="status-library-link"
-          title="打开笔记库"
-          @click="libraryOpen = true"
-        >
-          全部笔记
-        </button>
+        <span class="workspace-status-copy">{{ workspaceState }}</span>
       </footer>
     </main>
 

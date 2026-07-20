@@ -86,14 +86,22 @@ export function getSyncProviderStatus(provider: SyncProvider): SyncProviderStatu
   }
 
   const cap = probeWebdivCapabilities()
-  // webdiv 尚未接通：即使宿主有 db，也不声明 ready
+  // 实验：暴露宿主 db 能力状态，但仍不以「云已同步」承诺文件同步完成
+  const cloudHint =
+    cap.replicateState === null
+      ? '宿主云同步未开启（请在 ZTools 设置中登录/启动同步）'
+      : cap.replicateState === 1
+        ? '宿主云复制进行中'
+        : cap.replicateState === 0
+          ? '宿主云复制空闲'
+          : '无法读取宿主复制状态'
   return {
     provider: 'webdiv',
     ready: false,
-    label: 'WebDIV（预留）',
+    label: '宿主云同步（实验）',
     detail: cap.hasDb
-      ? '宿主具备 ztools.db，但笔记文件同步协议尚未实现'
-      : '未检测到可用 WebDIV/远程笔记 API；当前仅为配置占位',
+      ? `宿主具备 ztools.db；笔记仍以本地 Markdown 为准。${cloudHint}`
+      : '未检测到 ztools.db；可将笔记目录放到网盘同步文件夹作为替代',
   }
 }
 

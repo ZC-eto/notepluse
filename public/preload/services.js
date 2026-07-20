@@ -195,27 +195,28 @@ function listFolders() {
   return { root, folders, defaults: DEFAULT_FOLDERS.slice() }
 }
 
-function createFolder(name) {
+function createFolder(name, parentFolder) {
   const root = getNotesRoot()
-  const safe = sanitizeFolderName(name)
-  if (!safe) throw new Error('文件夹名称为空')
-  const full = path.join(root, safe)
-  if (fs.existsSync(full)) {
-    return {
-      name: safe,
-      path: safe,
-      fullPath: full,
-      kind: folderKind(safe),
-      existed: true,
-    }
-  }
+  const parent = normalizeRelFolder(parentFolder || '')
+  // 支持多级：name 可为「项目A」或「工作/项目A」；parentFolder 为相对父路径
+  const rawName = String(name || '').replace(/\\/g, '/')
+  const pieces = rawName
+    .split('/')
+    .map((p) => sanitizeFolderName(p))
+    .filter(Boolean)
+  if (!pieces.length) throw new Error('文件夹名称为空')
+  const rel = normalizeRelFolder([parent, ...pieces].filter(Boolean).join('/'))
+  if (!rel) throw new Error('文件夹名称为空')
+  const full = resolveUnderRoot(root, rel)
+  const existed = fs.existsSync(full)
   fs.mkdirSync(full, { recursive: true })
+  const leaf = pieces[pieces.length - 1]
   return {
-    name: safe,
-    path: safe,
+    name: leaf,
+    path: rel,
     fullPath: full,
-    kind: folderKind(safe),
-    existed: false,
+    kind: folderKind(rel),
+    existed,
   }
 }
 

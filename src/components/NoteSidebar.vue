@@ -99,7 +99,7 @@ function onToggleGroup(folder: string) {
 }
 
 function onNewFolder() {
-  void ws.createFolder()
+  void ws.createFolder(undefined, ws.activeFolder || '')
 }
 
 function onSyncChange(ev: Event) {
@@ -114,6 +114,17 @@ function isCollapsed(folder: string) {
 function folderPanelId(folder: string, index: number) {
   const safeFolder = folder.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'root'
   return `note-folder-${index}-${safeFolder}`
+}
+
+function depthOf(folder: string) {
+  if (!folder) return 0
+  return Math.max(0, folder.split('/').filter(Boolean).length - 1)
+}
+
+function displayFolderLabel(group: { folder: string; label: string }) {
+  if (!group.folder) return group.label
+  const parts = group.folder.split('/').filter(Boolean)
+  return parts[parts.length - 1] || group.label
 }
 </script>
 
@@ -151,7 +162,6 @@ function folderPanelId(folder: string, index: number) {
 
     <div v-if="!ws.notes.length" class="onboard-card">
       <div class="onboard-title">还没有笔记</div>
-      <div class="onboard-desc">清单放进「任务组」后才会出现在待办、日历和甘特。</div>
       <button type="button" class="btn-solid" @click="ws.createNote(ws.activeFolder)">新建笔记</button>
     </div>
     <div v-if="(ws as any).lastDeleted && (ws as any).lastDeleted.expires > Date.now()" class="undo-delete-bar" role="status">
@@ -181,28 +191,29 @@ function folderPanelId(folder: string, index: number) {
         :key="group.folder || '__root__'"
         class="folder-group"
         :class="{ active: ws.activeFolder === group.folder }"
+        :style="{ '--folder-depth': Math.max(0, depthOf(group.folder)) }"
       >
-        <div class="folder-head">
+        <div class="folder-head" :style="{ paddingLeft: `${Math.max(0, depthOf(group.folder)) * 12}px` }">
           <button
             type="button"
             class="folder-toggle"
-            :aria-label="isCollapsed(group.folder) ? `展开 ${group.label}` : `折叠 ${group.label}`"
+            :aria-label="isCollapsed(group.folder) ? `展开 ${displayFolderLabel(group)}` : `折叠 ${displayFolderLabel(group)}`"
             :aria-expanded="!isCollapsed(group.folder)"
             :aria-controls="folderPanelId(group.folder, groupIndex)"
             @click="onToggleGroup(group.folder)"
           >
             <span aria-hidden="true" />
           </button>
-          <button type="button" class="folder-select" :aria-pressed="ws.activeFolder === group.folder" @click="onSelectFolder(group.folder)">
+          <button type="button" class="folder-select" :aria-pressed="ws.activeFolder === group.folder" :title="group.folder || '根目录'" @click="onSelectFolder(group.folder)">
             <span class="folder-icon" aria-hidden="true"><i /></span>
-            <span class="folder-label">{{ group.label }}</span>
+            <span class="folder-label">{{ displayFolderLabel(group) }}</span>
             <span v-if="kindBadge(group.kind)" class="folder-badge" :data-kind="group.kind">{{ kindBadge(group.kind) }}</span>
             <span class="folder-count">{{ group.notes.length }}</span>
           </button>
           <button
             type="button"
             class="folder-add"
-            :aria-label="`在 ${group.label} 新建笔记`"
+            :aria-label="`在 ${displayFolderLabel(group)} 新建笔记`"
             title="在此文件夹新建笔记"
             @click="onCreateInFolder(group.folder)"
           >
@@ -268,17 +279,6 @@ function folderPanelId(folder: string, index: number) {
     </div>
 
     <div class="sidebar-foot">
-      <div class="sync-row">
-        <label class="sync-label" for="sync-provider">存储</label>
-        <select id="sync-provider" class="sync-select" :value="ws.syncProvider" @change="onSyncChange">
-          <option value="local">本地文件</option>
-          <option value="webdiv">WebDIV（预留）</option>
-        </select>
-      </div>
-      <div class="sync-hint" :title="ws.syncStatus?.detail">
-        <span class="sync-state-dot" :class="{ offline: !ws.syncStatus?.ready }" aria-hidden="true" />
-        {{ ws.syncStatus?.ready ? ws.syncStatus?.label : (ws.syncStatus?.detail || '本地') }}
-      </div>
       <div class="root-path" :title="ws.notesRoot">{{ ws.notesRoot || '本地笔记' }}</div>
       <div class="foot-actions">
         <button type="button" class="btn-ghost sm" @click="onRootChange">更换目录</button>

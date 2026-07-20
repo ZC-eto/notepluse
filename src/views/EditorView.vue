@@ -404,8 +404,8 @@ onBeforeUnmount(() => {
       <p class="empty-desc">
         {{
           ws.isEmptyWorkspace
-            ? '新建空白笔记开始书写。清单放进「任务组」后才会出现在待办、日历和甘特。'
-            : '从左侧打开一篇，或新建空白笔记。'
+            ? '点「新建笔记」开始。需要待办时再插入任务组。'
+            : '点左上角「笔记库」切换多篇，或新建。'
         }}
       </p>
       <div class="empty-actions">
