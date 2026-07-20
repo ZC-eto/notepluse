@@ -547,13 +547,14 @@ onBeforeUnmount(cleanupDragListeners)
         <HelpTip :text="ganttEmptyHelpText" label="空排期说明" />
       </div>
       <template v-if="!hasTargets">
+        <p class="empty-desc">甘特只投影任务组中的跨日区间与里程碑。可先填充示例体验，或在源码中声明任务组。</p>
         <div class="empty-actions">
           <button type="button" class="btn-solid" @click="fillDemoSamples">填充示例数据</button>
+          <span class="composer-inline-help">
+            <HelpTip :text="taskBlockHowToText" label="如何写任务组" />
+            <span>如何写任务组</span>
+          </span>
         </div>
-        <p class="composer-inline-help">
-          <HelpTip :text="ganttWriteHelpText" label="写入目标说明" />
-          <span>需先有任务组</span>
-        </p>
       </template>
       <p v-else class="empty-desc">在上方填写标题与跨日区间即可添加。</p>
     </div>

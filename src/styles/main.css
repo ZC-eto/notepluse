@@ -691,7 +691,6 @@ input, textarea {
   border-radius: 14px;
   background: var(--surface);
   padding: 10px;
-  box-shadow: var(--shadow);
 }
 .composer-main {
   display: flex;
@@ -3345,6 +3344,49 @@ select:focus-visible,
   max-width: 240px;
 }
 
+/* Todo compose: under toolbar or empty-state (no bottom sticky block) */
+.todo-compose-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-2) 72%, var(--surface));
+  box-sizing: border-box;
+  min-width: 0;
+}
+.todo-view .view-toolbar .todo-compose-panel {
+  margin-top: 2px;
+}
+.todo-compose-panel.todo-compose-empty {
+  width: min(100%, 640px);
+  text-align: left;
+  background: var(--surface);
+  box-shadow: none;
+}
+.todo-compose-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+}
+.todo-compose-toggle.active {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--workline, var(--accent)) 35%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface));
+}
+.todo-empty-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Shared composer field chrome (calendar / gantt / todo panel) */
 .composer {
   display: flex;
   flex-direction: column;
@@ -3371,6 +3413,7 @@ select:focus-visible,
   align-items: center;
   gap: 8px;
   min-width: 0;
+  flex-wrap: wrap;
 }
 .composer-dates {
   display: flex;
@@ -3386,6 +3429,9 @@ select:focus-visible,
   margin: 0;
   color: var(--muted);
   font-size: 12px;
+}
+.todo-compose-panel .view-alert {
+  display: block;
 }
 
 .view-alert {
@@ -3478,6 +3524,7 @@ select:focus-visible,
   display: none;
 }
 .view-alert.view-semantic-hint,
+.todo-compose-panel .view-alert,
 .composer .view-alert {
   display: block;
 }
@@ -3725,11 +3772,13 @@ html.mini-mode body {
     max-width: none;
     flex: 1 1 auto;
   }
-  .composer-main {
+  .composer-main,
+  .todo-compose-panel .composer-main {
     flex-direction: column;
     align-items: stretch;
   }
-  .composer-main .btn-solid {
+  .composer-main .btn-solid,
+  .todo-compose-panel .composer-main .btn-solid {
     width: 100%;
   }
 }

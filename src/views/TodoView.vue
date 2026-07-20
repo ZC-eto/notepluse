@@ -31,6 +31,10 @@ const selectedTargetKey = ref('')
 const expanded = ref<Record<string, boolean>>({})
 const pendingDelete = ref<GlobalTask | null>(null)
 const draftInput = ref<HTMLInputElement | null>(null)
+/** 有列表时：新建面板默认折叠，避免底部常驻大块 */
+const composeOpen = ref(false)
+const composeMoreOpen = ref(false)
+const seeding = ref(false)
 
 const globalTasks = computed<GlobalTask[]>(() => {
   const list = (ws as any).allTasks as GlobalTask[] | undefined
@@ -71,8 +75,11 @@ const emptyTitle = computed(() => {
 const emptyHelpText = computed(() =>
   taskBlockTargets.value.length
     ? '选择目标笔记与任务组后即可新建任务。普通勾选清单不会自动进待办。'
-    : '先在源码中插入一个任务组；普通勾选清单不会自动进待办。'
+    : '当前没有可投影的任务组。可一键填充示例，或在源码中插入 <!-- mdw:tasks --> 任务块。普通勾选清单不会自动进待办。'
 )
+
+const taskBlockHowToText =
+  '在 Markdown 源码中用 HTML 注释包裹任务清单，例如：<!-- mdw:tasks id="daily" name="今日" color="blue" --> … - [ ] 事项 @date(2026-07-20) … <!-- /mdw:tasks -->。只有块内的显式任务会进入待办 / 日历 / 甘特。'
 
 const composerHelpText = computed(() => {
   if (!taskBlockTargets.value.length) {
@@ -296,8 +303,31 @@ function toggleTag(tag: string) {
 }
 
 async function focusComposer() {
+  composeOpen.value = true
   await nextTick()
   draftInput.value?.focus()
+}
+
+function toggleCompose() {
+  composeOpen.value = !composeOpen.value
+  if (composeOpen.value) {
+    void nextTick(() => draftInput.value?.focus())
+  }
+}
+
+async function seedSamples() {
+  if (seeding.value) return
+  seeding.value = true
+  try {
+    await (ws as any).ensureDemoSamples?.()
+  } finally {
+    seeding.value = false
+  }
+}
+
+function goInsertTaskBlock() {
+  ws.setView('editor')
+  window.dispatchEvent(new CustomEvent('mdw:insert-task-block'))
 }
 
 async function add() {
@@ -333,6 +363,7 @@ async function add() {
   draftScheduleKind.value = 'none'
   draftType.value = 'task'
   draftPriority.value = ''
+  composeMoreOpen.value = false
   await focusComposer()
 }
 
@@ -412,6 +443,15 @@ async function openSource(task: GlobalTask) {
             <button type="button" class="seg-btn" :class="{ active: filter === 'open' }" @click="filter = 'open'">未完成</button>
             <button type="button" class="seg-btn" :class="{ active: filter === 'done' }" @click="filter = 'done'">已完成</button>
           </div>
+          <button
+            v-if="emptyKind !== 'scope' && taskBlockTargets.length"
+            type="button"
+            class="btn-ghost sm todo-compose-toggle"
+            :class="{ active: composeOpen }"
+            :aria-expanded="composeOpen"
+            aria-controls="todo-compose-panel"
+            @click="toggleCompose"
+          >{{ composeOpen ? '收起' : '添加任务' }}</button>
         </div>
       </div>
 
@@ -424,6 +464,74 @@ async function openSource(task: GlobalTask) {
         <span v-if="todaySummary.active" class="sum-chip">进行中 / 单日 {{ todaySummary.active }}</span>
         <span v-if="todaySummary.dueToday" class="sum-chip">今日截止 {{ todaySummary.dueToday }}</span>
       </div>
+
+      <section
+        v-if="composeOpen && emptyKind !== 'scope' && taskBlockTargets.length"
+        id="todo-compose-panel"
+        class="todo-compose-panel"
+        aria-label="新建任务"
+      >
+        <div class="todo-compose-head">
+          <span class="composer-label">新建任务</span>
+          <HelpTip :text="composerHelpText" label="新建任务说明" placement="left" />
+        </div>
+        <div class="composer-main">
+          <select v-model="selectedTargetKey" class="date-input" aria-label="目标笔记和任务组">
+            <option value="">选择目标笔记 / 任务组</option>
+            <option v-for="target in taskBlockTargets" :key="targetKey(target)" :value="targetKey(target)">
+              {{ target.folder ? target.folder + ' / ' : '' }}{{ target.noteName }} / {{ target.blockName }}
+            </option>
+          </select>
+          <input
+            ref="draftInput"
+            v-model="draft"
+            class="composer-input"
+            :disabled="!hasWritableTarget"
+            placeholder="输入任务标题"
+            @keyup.enter="add"
+          />
+          <button type="button" class="btn-solid" :disabled="!canAddDraft" @click="add">添加</button>
+          <button
+            type="button"
+            class="btn-ghost sm"
+            :aria-expanded="composeMoreOpen"
+            @click="composeMoreOpen = !composeMoreOpen"
+          >{{ composeMoreOpen ? '收起选项' : '更多' }}</button>
+        </div>
+        <div v-if="composeMoreOpen" class="composer-dates">
+          <select
+            v-model="draftScheduleKind"
+            class="date-input"
+            aria-label="任务日期语义"
+            title="未排期（收件箱） / 单日安排 @date / 截止日期 @due / 执行区间 @start + @end"
+          >
+            <option value="none">未排期（收件箱）</option>
+            <option value="date">单日安排 @date</option>
+            <option value="due">截止日期 @due</option>
+            <option value="range">执行区间 @start + @end</option>
+          </select>
+          <input v-if="draftScheduleKind === 'date' || draftScheduleKind === 'due'" v-model="draftDate" class="date-input" type="date" :aria-label="draftScheduleKind === 'due' ? '截止日期' : '安排日期'" />
+          <template v-if="draftScheduleKind === 'range'">
+            <input v-model="draftStart" class="date-input" type="date" aria-label="执行开始日期" />
+            <span class="date-sep">至</span>
+            <input v-model="draftEnd" class="date-input" type="date" aria-label="执行结束日期" />
+          </template>
+          <select v-model="draftType" class="date-input" aria-label="任务类型">
+            <option value="task">任务</option>
+            <option value="group">分组</option>
+            <option value="milestone">里程碑</option>
+          </select>
+          <select v-model="draftPriority" class="date-input" aria-label="任务优先级">
+            <option value="">无优先级</option>
+            <option value="urgent">紧急</option>
+            <option value="high">高</option>
+            <option value="medium">中</option>
+            <option value="low">低</option>
+          </select>
+        </div>
+        <p v-if="composeMoreOpen && draftScheduleKind === 'range' && draftStart && draftEnd && draftStart > draftEnd" class="view-alert" role="alert">结束日期不能早于开始日期；请修正后再添加，系统不会自动交换日期。</p>
+        <p v-if="composeMoreOpen && draftType === 'milestone' && draftScheduleKind !== 'date'" class="view-alert" role="alert">里程碑应使用 @type(milestone) + @date；请选择“单日安排”。</p>
+      </section>
     </header>
 
     <div v-if="allTags.length || allBlocks.length" class="tag-filter" aria-label="任务属性筛选">
@@ -447,7 +555,81 @@ async function openSource(task: GlobalTask) {
         <div class="empty-title">{{ emptyTitle }}</div>
         <HelpTip :text="emptyHelpText" label="空状态说明" />
       </div>
-      <button v-if="taskBlockTargets.length" type="button" class="btn-solid" @click="focusComposer">新建任务</button>
+      <template v-if="!taskBlockTargets.length">
+        <p class="empty-desc">待办只聚合任务组中的事项。可先填充示例体验，或在源码中自行声明任务组。</p>
+        <div class="empty-actions">
+          <button type="button" class="btn-solid" :disabled="seeding" @click="seedSamples">
+            {{ seeding ? '正在填充…' : '填充示例数据' }}
+          </button>
+          <button type="button" class="btn-ghost" @click="goInsertTaskBlock">去源码插入任务组</button>
+          <span class="composer-inline-help">
+            <HelpTip :text="taskBlockHowToText" label="如何写任务组" />
+            <span>如何写任务组</span>
+          </span>
+        </div>
+      </template>
+      <section v-else class="todo-compose-panel todo-compose-empty" aria-label="新建任务">
+        <div class="todo-compose-head">
+          <span class="composer-label">新建任务</span>
+          <HelpTip :text="composerHelpText" label="新建任务说明" placement="left" />
+        </div>
+        <div class="composer-main">
+          <select v-model="selectedTargetKey" class="date-input" aria-label="目标笔记和任务组">
+            <option value="">选择目标笔记 / 任务组</option>
+            <option v-for="target in taskBlockTargets" :key="targetKey(target)" :value="targetKey(target)">
+              {{ target.folder ? target.folder + ' / ' : '' }}{{ target.noteName }} / {{ target.blockName }}
+            </option>
+          </select>
+          <input
+            ref="draftInput"
+            v-model="draft"
+            class="composer-input"
+            :disabled="!hasWritableTarget"
+            placeholder="输入任务标题"
+            @keyup.enter="add"
+          />
+          <button type="button" class="btn-solid" :disabled="!canAddDraft" @click="add">添加</button>
+          <button
+            type="button"
+            class="btn-ghost sm"
+            :aria-expanded="composeMoreOpen"
+            @click="composeMoreOpen = !composeMoreOpen"
+          >{{ composeMoreOpen ? '收起选项' : '更多' }}</button>
+        </div>
+        <div v-if="composeMoreOpen" class="composer-dates">
+          <select
+            v-model="draftScheduleKind"
+            class="date-input"
+            aria-label="任务日期语义"
+            title="未排期（收件箱） / 单日安排 @date / 截止日期 @due / 执行区间 @start + @end"
+          >
+            <option value="none">未排期（收件箱）</option>
+            <option value="date">单日安排 @date</option>
+            <option value="due">截止日期 @due</option>
+            <option value="range">执行区间 @start + @end</option>
+          </select>
+          <input v-if="draftScheduleKind === 'date' || draftScheduleKind === 'due'" v-model="draftDate" class="date-input" type="date" :aria-label="draftScheduleKind === 'due' ? '截止日期' : '安排日期'" />
+          <template v-if="draftScheduleKind === 'range'">
+            <input v-model="draftStart" class="date-input" type="date" aria-label="执行开始日期" />
+            <span class="date-sep">至</span>
+            <input v-model="draftEnd" class="date-input" type="date" aria-label="执行结束日期" />
+          </template>
+          <select v-model="draftType" class="date-input" aria-label="任务类型">
+            <option value="task">任务</option>
+            <option value="group">分组</option>
+            <option value="milestone">里程碑</option>
+          </select>
+          <select v-model="draftPriority" class="date-input" aria-label="任务优先级">
+            <option value="">无优先级</option>
+            <option value="urgent">紧急</option>
+            <option value="high">高</option>
+            <option value="medium">中</option>
+            <option value="low">低</option>
+          </select>
+        </div>
+        <p v-if="composeMoreOpen && draftScheduleKind === 'range' && draftStart && draftEnd && draftStart > draftEnd" class="view-alert" role="alert">结束日期不能早于开始日期；请修正后再添加，系统不会自动交换日期。</p>
+        <p v-if="composeMoreOpen && draftType === 'milestone' && draftScheduleKind !== 'date'" class="view-alert" role="alert">里程碑应使用 @type(milestone) + @date；请选择“单日安排”。</p>
+      </section>
     </div>
 
     <div v-else-if="emptyKind === 'filtered'" class="empty-state compact todo-empty">
@@ -522,62 +704,5 @@ async function openSource(task: GlobalTask) {
       @confirm="confirmRemove"
       @cancel="cancelRemove"
     />
-
-    <section class="composer" aria-label="新建任务">
-      <div class="composer-head">
-        <span class="composer-label">新建任务</span>
-        <HelpTip :text="composerHelpText" label="新建任务说明" placement="left" />
-      </div>
-      <div class="composer-main">
-        <select v-model="selectedTargetKey" class="date-input" aria-label="目标笔记和任务组">
-          <option value="">选择目标笔记 / 任务组</option>
-          <option v-for="target in taskBlockTargets" :key="targetKey(target)" :value="targetKey(target)">
-            {{ target.folder ? target.folder + ' / ' : '' }}{{ target.noteName }} / {{ target.blockName }}
-          </option>
-        </select>
-        <input
-          ref="draftInput"
-          v-model="draft"
-          class="composer-input"
-          :disabled="!hasWritableTarget"
-          placeholder="输入任务标题"
-          @keyup.enter="add"
-        />
-        <button type="button" class="btn-solid" :disabled="!canAddDraft" @click="add">添加</button>
-      </div>
-      <div class="composer-dates">
-        <select
-          v-model="draftScheduleKind"
-          class="date-input"
-          aria-label="任务日期语义"
-          title="未排期（收件箱） / 单日安排 @date / 截止日期 @due / 执行区间 @start + @end"
-        >
-          <option value="none">未排期（收件箱）</option>
-          <option value="date">单日安排 @date</option>
-          <option value="due">截止日期 @due</option>
-          <option value="range">执行区间 @start + @end</option>
-        </select>
-        <input v-if="draftScheduleKind === 'date' || draftScheduleKind === 'due'" v-model="draftDate" class="date-input" type="date" :aria-label="draftScheduleKind === 'due' ? '截止日期' : '安排日期'" />
-        <template v-if="draftScheduleKind === 'range'">
-          <input v-model="draftStart" class="date-input" type="date" aria-label="执行开始日期" />
-          <span class="date-sep">至</span>
-          <input v-model="draftEnd" class="date-input" type="date" aria-label="执行结束日期" />
-        </template>
-        <select v-model="draftType" class="date-input" aria-label="任务类型">
-          <option value="task">任务</option>
-          <option value="group">分组</option>
-          <option value="milestone">里程碑</option>
-        </select>
-        <select v-model="draftPriority" class="date-input" aria-label="任务优先级">
-          <option value="">无优先级</option>
-          <option value="urgent">紧急</option>
-          <option value="high">高</option>
-          <option value="medium">中</option>
-          <option value="low">低</option>
-        </select>
-      </div>
-      <p v-if="draftScheduleKind === 'range' && draftStart && draftEnd && draftStart > draftEnd" class="view-alert" role="alert">结束日期不能早于开始日期；请修正后再添加，系统不会自动交换日期。</p>
-      <p v-if="draftType === 'milestone' && draftScheduleKind !== 'date'" class="view-alert" role="alert">里程碑应使用 @type(milestone) + @date；请选择“单日安排”。</p>
-    </section>
   </div>
 </template>

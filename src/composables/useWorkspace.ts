@@ -385,18 +385,25 @@ export function useWorkspace() {
         created += 1
       }
       await refreshNotes()
-      if (created === 0) {
-        status.value = skipped ? `示例已齐全（${skipped} 篇）` : '示例笔记已存在'
-      } else {
-        status.value = `已创建 ${created} 篇示例` + (skipped ? `（跳过 ${skipped}）` : '')
-      }
       // 打开今日计划，方便立刻看到待办投影
       const todayNote = notes.value.find(
         (n) => n.folder === '今日待办' && n.name.replace(/\.md$/i, '') === `今日计划-${date}`
       )
+      let openedTodo = false
       if (todayNote) {
         await openNote(todayNote.path)
         setView('todo')
+        openedTodo = true
+      }
+      if (created === 0) {
+        status.value = skipped
+          ? openedTodo
+            ? `示例已齐全（${skipped} 篇），已打开今日计划 → 待办`
+            : `示例已齐全（${skipped} 篇）`
+          : '示例笔记已存在'
+      } else {
+        const base = `已创建 ${created} 篇示例` + (skipped ? `（跳过 ${skipped}）` : '')
+        status.value = openedTodo ? `${base}，已切换到待办视图` : base
       }
     } catch (e) {
       console.warn(e)
