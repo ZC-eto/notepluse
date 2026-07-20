@@ -11,7 +11,7 @@ import { parseTaskDocument } from './parseTasks'
 marked.setOptions({ gfm: true, breaks: false })
 
 /** 工具条历史动作（兼容） */
-export type ToolbarAction = 'h1' | 'h2' | 'bold' | 'italic' | 'list' | 'task' | 'link' | 'date'
+export type ToolbarAction = 'h1' | 'h2' | 'bold' | 'italic' | 'list' | 'task' | 'link' | 'date' | 'code' | 'codeBlock' | 'quote' | 'ol' | 'strikethrough'
 
 /** 编辑器格式 / 快捷键动作 */
 export type FormatAction =
@@ -20,7 +20,10 @@ export type FormatAction =
   | 'underline'
   | 'strikethrough'
   | 'code'
+  | 'codeBlock'
+  | 'quote'
   | 'link'
+  | 'h2'
   | 'h3'
   | 'h4'
   | 'h5'
@@ -420,6 +423,8 @@ export function resolveEditorShortcut(e: ShortcutInput): FormatAction | null {
   // Ctrl+Shift+*
   if (key === 'x' || code === 'KeyX') return 'strikethrough'
   if (key === '`' || code === 'Backquote') return 'code'
+  if (key === 'c' || code === 'KeyC') return 'codeBlock'
+  if (key === '.' || code === 'Period') return 'quote'
   if (key === 't' || code === 'KeyT') return 'toggleTask'
   // Ctrl+Shift+8 无序；部分键盘 Shift+8 产生 *
   if (code === 'Digit8' || key === '8' || key === '*') return 'ul'
@@ -451,6 +456,18 @@ export function applySourceFormat(
       return wrapInline(text, s, e, '~~', '~~', '删除线文本')
     case 'code':
       return wrapInline(text, s, e, '`', '`', 'code')
+    case 'codeBlock': {
+      const body = selected || 'code'
+      const block = '```\n' + body + '\n```'
+      return replaceRange(text, s, e, block)
+    }
+    case 'quote':
+      return prefixSelectedLines(text, s, e, (line) => {
+        const trimmed = line.replace(/^\s+/, '')
+        if (trimmed.startsWith('> ')) return line
+        const indent = line.match(/^(\s*)/)?.[1] || ''
+        return indent + '> ' + trimmed
+      })
     case 'link':
       return applyLink(text, s, e)
     case 'h1':
@@ -706,6 +723,17 @@ export function applyWysiwygFormat(action: FormatAction, root?: HTMLElement | nu
       const text = sel?.toString() || 'code'
       return document.execCommand('insertHTML', false, `<code>${escapeHtml(text)}</code>`)
     }
+    case 'codeBlock': {
+      const sel = window.getSelection()
+      const text = sel?.toString() || 'code'
+      return document.execCommand(
+        'insertHTML',
+        false,
+        `<pre><code>${escapeHtml(text)}</code></pre><p><br></p>`
+      )
+    }
+    case 'quote':
+      return document.execCommand('formatBlock', false, 'blockquote')
     case 'link': {
       const sel = window.getSelection()
       const selected = sel?.toString() || ''

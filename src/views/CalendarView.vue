@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, ref } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { useWorkspace } from '../composables/useWorkspace'
 import type { GlobalTask, Task, TaskBlockTarget, TaskPatch } from '../core/types'
 import { displayTaskTitle } from '../core/taskSyntax'
@@ -23,6 +23,19 @@ const composeTitle = ref('')
 const composeTargetKey = ref('')
 const composeInput = ref<HTMLInputElement | null>(null)
 const selectedEventKey = ref<string | null>(null)
+
+function closeTaskPanel() {
+  selectedEventKey.value = null
+  composeDay.value = null
+}
+
+function onEscapeLayer() {
+  if (selectedEventKey.value || composeDay.value) closeTaskPanel()
+}
+
+onMounted(() => window.addEventListener('mdw:escape-layer', onEscapeLayer))
+onBeforeUnmount(() => window.removeEventListener('mdw:escape-layer', onEscapeLayer))
+
 
 type TaskLike = Task | GlobalTask
 type CalendarKind = 'date' | 'due' | 'range' | 'milestone'
@@ -417,6 +430,9 @@ function eventDateSummary(event: CalendarEvent) {
     </div>
 
     <div v-if="selectedEvent" class="cal-task-panel">
+      <div class="cal-task-panel-actions">
+        <button type="button" class="btn-ghost sm" @click="closeTaskPanel">关闭详情</button>
+      </div>
       <TaskInspector
         :task="selectedEvent.task"
         :related-tasks="sourceTasks"
@@ -427,9 +443,6 @@ function eventDateSummary(event: CalendarEvent) {
         @request-toggle="handleInspectorToggle"
         @request-open-source="handleInspectorOpenSource"
       />
-      <div class="cal-task-panel-actions">
-        <button type="button" class="btn-ghost sm" @click="selectedEventKey = null">关闭详情</button>
-      </div>
     </div>
   </div>
 </template>

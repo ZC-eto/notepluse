@@ -519,11 +519,13 @@ function weekday(date: Date) {
 
 onMounted(() => {
   window.addEventListener('keydown', onGanttKeydown)
+  window.addEventListener('mdw:escape-layer', clearSelection as any)
 })
 
 onBeforeUnmount(() => {
   cleanupDragListeners()
   window.removeEventListener('keydown', onGanttKeydown)
+  window.removeEventListener('mdw:escape-layer', clearSelection as any)
 })
 </script>
 
@@ -700,6 +702,10 @@ onBeforeUnmount(() => {
           <span v-if="!canWrite(selectedEntry.task)" class="status-chip muted">只读</span>
         </div>
 
+        <div class="gantt-task-panel-actions">
+          <button type="button" class="btn-ghost" @click="clearSelection">关闭详情</button>
+          <button type="button" class="btn-ghost danger" :disabled="!canWrite(selectedEntry.task)" @click="requestRemove(selectedEntry.task)">删除任务</button>
+        </div>
         <TaskInspector
           :task="selectedEntry.task"
           :related-tasks="sourceTasks"
@@ -710,10 +716,6 @@ onBeforeUnmount(() => {
           @request-toggle="handleInspectorToggle"
           @request-open-source="handleInspectorOpenSource"
         />
-        <div class="gantt-task-panel-actions">
-          <button type="button" class="btn-ghost danger" :disabled="!canWrite(selectedEntry.task)" @click="requestRemove(selectedEntry.task)">删除任务</button>
-          <button type="button" class="btn-ghost" @click="clearSelection">关闭详情</button>
-        </div>
       </div>
     </template>
 

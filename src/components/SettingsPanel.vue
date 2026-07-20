@@ -87,6 +87,11 @@ function restartTour() {
   ;(ws as any).restartOnboarding?.()
 }
 
+function openShortcuts() {
+  emit('close')
+  window.dispatchEvent(new CustomEvent('mdw:open-shortcuts'))
+}
+
 onMounted(() => window.addEventListener('keydown', onKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
@@ -203,6 +208,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             </h3>
             <div class="settings-actions">
               <button type="button" class="btn-solid sm" @click="restartTour">重新开始引导</button>
+              <button type="button" class="btn-ghost sm" @click="openShortcuts">快捷键一览</button>
             </div>
             <div class="settings-help-topics">
               <details class="settings-help">

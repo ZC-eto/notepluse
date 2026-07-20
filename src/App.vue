@@ -13,6 +13,7 @@ import GanttView from './views/GanttView.vue'
 import CalendarView from './views/CalendarView.vue'
 import MiniStickyView from './views/MiniStickyView.vue'
 import OnboardingTour from './components/OnboardingTour.vue'
+import ShortcutsPanel from './components/ShortcutsPanel.vue'
 
 const isMiniMode =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'mini'
@@ -27,6 +28,7 @@ provide('workspace', ws)
 const ui = useUiDialogState()
 /** 默认收起：写正文时不抢空间；需要时点「笔记库」打开 */
 const libraryOpen = ref(false)
+const shortcutsOpen = ref(false)
 const mobileLibraryToggle = ref<HTMLButtonElement | null>(null)
 
 const allViewMeta: {
@@ -35,7 +37,7 @@ const allViewMeta: {
   title: string
   icon: 'editor' | 'todo' | 'gantt' | 'calendar'
 }[] = [
-  { id: 'editor', label: '笔记', title: '笔记（Ctrl+1）', icon: 'editor' },
+  { id: 'editor', label: '笔记', title: '笔记（Ctrl+1；双击打开笔记库）', icon: 'editor' },
   { id: 'todo', label: '待办', title: '待办（Ctrl+2）', icon: 'todo' },
   { id: 'gantt', label: '甘特', title: '甘特（Ctrl+3）', icon: 'gantt' },
   { id: 'calendar', label: '日历', title: '日历（Ctrl+4）', icon: 'calendar' },
@@ -98,7 +100,24 @@ function selectView(view: AppView) {
     return
   }
   ws.setView(view)
-  // 不再自动弹出笔记库，避免挡住正文
+  // 单击导航只切视图，不自动弹出笔记库（双击笔记才开库）
+}
+
+/** 双击「笔记」：打开笔记库并挤压主画布（非覆盖） */
+function onRailActivate(view: AppView, ev: MouseEvent) {
+  if (view === 'editor' && ev.detail >= 2) {
+    selectView('editor')
+    libraryOpen.value = true
+    return
+  }
+  selectView(view)
+}
+
+function openLibraryPushed() {
+  libraryOpen.value = true
+  if (ws.view !== 'editor' && ((ws as any).enabledViews as AppView[] | undefined)?.includes('editor')) {
+    // 从其它视图开库时不必强制切笔记
+  }
 }
 
 function viewShortcut(view: AppView) {
@@ -148,14 +167,26 @@ function handleEnter(action: any) {
 function onKeydown(ev: KeyboardEvent) {
   if (ui.confirm.open || ui.prompt.open) return
 
-  if (ev.key === 'Escape' && libraryOpen.value) {
-    // 窄屏抽屉模式才收起；宽屏常驻笔记库时不因 Esc 关掉
-    const narrow = window.matchMedia('(max-width: 900px)').matches
-    if (narrow) {
+  if (ev.key === 'Escape') {
+    if (shortcutsOpen.value) {
+      ev.preventDefault()
+      shortcutsOpen.value = false
+      return
+    }
+    if ((ws as any).settingsOpen) {
+      ev.preventDefault()
+      ws.setSettingsOpen(false)
+      return
+    }
+    if (libraryOpen.value) {
+      // 宽屏挤压布局与窄屏抽屉：Esc 均关闭笔记库
       ev.preventDefault()
       libraryOpen.value = false
       mobileLibraryToggle.value?.focus()
+      return
     }
+    // 日历/甘特详情关闭由各视图自行监听 mdw:escape-layer
+    window.dispatchEvent(new CustomEvent('mdw:escape-layer'))
     return
   }
 
@@ -169,8 +200,7 @@ function onKeydown(ev: KeyboardEvent) {
     return
   }
   if (key === 'b' && !isTextEntry && !ev.shiftKey && !ev.altKey) {
-    // Ctrl+B 在编辑区是粗体；输入区外切换笔记库
-    // 交给输入区走格式快捷键，这里仅非输入时
+    // Ctrl+B 在编辑区是粗体；输入区外不抢
   }
   if (key === '\\' && !isTextEntry) {
     ev.preventDefault()
@@ -184,7 +214,7 @@ function onKeydown(ev: KeyboardEvent) {
   }
   if (key === '/' && !ev.shiftKey && !ev.altKey && !isTextEntry) {
     ev.preventDefault()
-    toggleEditorModeFromShortcut()
+    shortcutsOpen.value = true
     return
   }
   if (key === 'm' && ev.shiftKey && !ev.altKey && !isTextEntry) {
@@ -220,6 +250,7 @@ function onKeydown(ev: KeyboardEvent) {
   if (key === '1' && !isTextEntry) {
     ev.preventDefault()
     selectView('editor')
+    // Ctrl+1 只进笔记视图，不开关库；Ctrl+\ 或顶栏「笔记库」开库
     return
   }
   if (key === '2' && !isTextEntry) {
@@ -251,6 +282,7 @@ onMounted(async () => {
   // 默认收起侧栏；若设置要求默认打开再展开
   libraryOpen.value = Boolean((ws as any).libraryDefaultOpen)
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener('mdw:open-shortcuts', () => { shortcutsOpen.value = true })
 
   if (window.ztools?.onPluginEnter) {
     window.ztools.onPluginEnter((action) => {
@@ -266,6 +298,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
+  // open-shortcuts is anonymous; rely on page unload in plugin session
   void ws.flushSave()
 })
 </script>
@@ -294,7 +327,8 @@ onBeforeUnmount(() => {
           :title="v.title"
           :aria-label="v.title"
           :aria-keyshortcuts="viewShortcut(v.id)"
-          @click="selectView(v.id)"
+          @click="onRailActivate(v.id, $event)"
+          @dblclick.prevent="onRailActivate(v.id, $event)"
         >
           <span class="rail-icon" aria-hidden="true">
             <!-- 清晰 SVG，避免 CSS 伪图标重叠错乱 -->
@@ -372,5 +406,6 @@ onBeforeUnmount(() => {
       @cancel="ui.resolvePrompt(null)"
     />
     <OnboardingTour />
+    <ShortcutsPanel :open="shortcutsOpen" @close="shortcutsOpen = false" />
   </div>
 </template>

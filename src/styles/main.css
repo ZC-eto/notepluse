@@ -2527,12 +2527,38 @@ input, textarea {
 }
 .cal-compose,
 .cal-task-panel {
+  position: relative;
+  z-index: 20;
+  isolation: isolate;
   margin-top: 10px;
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--surface) 88%, var(--surface-2));
+  background: var(--surface);
   box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.cal-task-panel .task-inspector,
+.cal-task-panel .inspector-shell {
+  position: relative;
+  z-index: 1;
+  background: var(--surface);
+}
+.cal-task-panel-actions {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.cal-task-panel-actions.is-bottom {
+  margin: 10px 0 0;
+  padding: 8px 0 0;
+  border-bottom: 0;
+  border-top: 1px solid var(--line);
 }
 .cal-compose-head {
   display: flex;
@@ -2559,13 +2585,6 @@ input, textarea {
 .cal-task-panel-meta {
   font-size: 12px;
   color: var(--muted);
-  width: 100%;
-}
-.cal-task-panel-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
   width: 100%;
 }
 
@@ -3135,39 +3154,51 @@ select:focus-visible,
   .top-actions { margin-left: 8px; }
 }
 
-/* 宿主插件窗体常见宽度 ~640–900：笔记库改为覆盖抽屉，但顶栏有明确入口 */
+/* 宿主窄窗：仍用挤压布局（rail + 库 + 主区），不再覆盖主画布 */
 @media (max-width: 900px) {
   .app-shell,
-  .app-shell[data-library='open'],
+  .app-shell[data-library='open'] {
+    grid-template-columns: 56px minmax(168px, 220px) minmax(0, 1fr);
+  }
   .app-shell[data-library='closed'] {
     grid-template-columns: 56px minmax(0, 1fr);
   }
   .library-drawer {
-    position: fixed;
-    z-index: 40;
-    top: 0;
-    bottom: 0;
-    left: 56px;
-    width: min(300px, calc(100vw - 64px));
+    position: relative;
+    z-index: 2;
     display: flex;
-    transform: translateX(-110%);
-    transition: transform .18s ease;
-    box-shadow: 18px 0 40px rgba(0,0,0,.18);
+    transform: none;
+    box-shadow: none;
     border-right: 1px solid var(--line);
+    min-width: 0;
+    max-width: none;
+    width: auto;
+    top: auto;
+    bottom: auto;
+    left: auto;
   }
-  .library-drawer.open { transform: translateX(0); }
-  .library-backdrop {
-    display: block;
-    position: fixed;
-    z-index: 35;
-    inset: 0;
-    left: 56px;
-    border: 0;
-    background: rgba(20, 24, 20, .34);
-  }
-  .main-pane { margin: 6px 8px 6px 6px; height: calc(100% - 12px); max-height: calc(100% - 12px); }
+  .app-shell[data-library='closed'] .library-drawer { display: none; }
+  .library-backdrop { display: none !important; }
+  .main-pane { margin: 6px 8px 6px 6px; height: calc(100% - 12px); max-height: calc(100% - 12px); min-width: 0; }
   .doc-title { max-width: 28vw; }
   .top-actions .save-pill { display: none; }
+}
+
+@media (max-width: 560px) {
+  /* 极窄：库改为底部挤压条高度受限，仍不覆盖 */
+  .app-shell[data-library='open'] {
+    grid-template-columns: 56px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(160px, 42%);
+  }
+  .app-shell[data-library='open'] .library-drawer {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    border-right: 0;
+    border-top: 1px solid var(--line);
+    max-height: 42vh;
+  }
+  .app-shell[data-library='open'] .work-rail { grid-row: 1; }
+  .app-shell[data-library='open'] .main-pane { grid-column: 2; grid-row: 1; min-height: 0; }
 }
 
 /* Cross-view task detail and small-screen fallbacks */
@@ -4604,4 +4635,79 @@ html[data-density='compact'] .md-body .task-block-boundary {
 .settings-help code {
   font-family: var(--mono);
   font-size: 0.92em;
+}
+
+/* Shortcuts panel */
+.shortcuts-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, #0b100e 48%, transparent);
+  backdrop-filter: blur(2px);
+}
+.shortcuts-panel {
+  width: min(560px, 100%);
+  max-height: min(80vh, 720px);
+  overflow: auto;
+  border-radius: 14px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+}
+.shortcuts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 8px;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+  border-bottom: 1px solid var(--line);
+}
+.shortcuts-title { margin: 0; font-size: 16px; font-weight: 700; }
+.shortcuts-lead {
+  margin: 0;
+  padding: 10px 16px 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.shortcuts-body { padding: 8px 16px 18px; display: grid; gap: 14px; }
+.shortcuts-group-title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+.shortcuts-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.shortcuts-table th {
+  text-align: left;
+  font-weight: 600;
+  padding: 6px 10px 6px 0;
+  width: 38%;
+  vertical-align: top;
+  color: var(--ink);
+}
+.shortcuts-table td {
+  padding: 6px 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.shortcuts-table kbd {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--ink);
 }

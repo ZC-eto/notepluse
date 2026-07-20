@@ -32,19 +32,25 @@ let historyNotePath = ''
 let historyTimer: ReturnType<typeof setTimeout> | null = null
 
 type ToolbarItem = {
-  id: ToolbarAction
+  id: string
   label: string
   title: string
   group: 'text' | 'list' | 'insert'
-  icon: 'h1' | 'bold' | 'italic' | 'list' | 'task' | 'link' | 'date'
+  icon: string
 }
 
 const toolbarItems: ToolbarItem[] = [
-  { id: 'h1', label: '标题', title: '一级标题 Ctrl+Alt+1', group: 'text', icon: 'h1' },
+  { id: 'h1', label: 'H1', title: '一级标题 Ctrl+Alt+1', group: 'text', icon: 'h1' },
+  { id: 'h2', label: 'H2', title: '二级标题 Ctrl+Alt+2', group: 'text', icon: 'h2' },
   { id: 'bold', label: '粗体', title: '粗体 Ctrl+B', group: 'text', icon: 'bold' },
   { id: 'italic', label: '斜体', title: '斜体 Ctrl+I', group: 'text', icon: 'italic' },
+  { id: 'strikethrough', label: '删除线', title: '删除线 Ctrl+Shift+X', group: 'text', icon: 'strike' },
+  { id: 'code', label: '行内代码', title: '行内代码 Ctrl+Shift+`', group: 'text', icon: 'code' },
+  { id: 'codeBlock', label: '代码块', title: '代码块 Ctrl+Shift+C', group: 'text', icon: 'codeBlock' },
   { id: 'list', label: '列表', title: '无序列表 Ctrl+Shift+8', group: 'list', icon: 'list' },
+  { id: 'ol', label: '有序', title: '有序列表 Ctrl+Shift+9', group: 'list', icon: 'ol' },
   { id: 'task', label: '清单', title: '普通勾选清单 - [ ]（不进待办）', group: 'list', icon: 'task' },
+  { id: 'quote', label: '引用', title: '引用 Ctrl+Shift+.', group: 'list', icon: 'quote' },
   { id: 'link', label: '链接', title: '插入链接 Ctrl+K', group: 'insert', icon: 'link' },
   { id: 'date', label: '今日', title: '插入今天日期', group: 'insert', icon: 'date' },
 ]
@@ -214,7 +220,7 @@ function applyWysiwygAction(action: FormatAction) {
   pushHistory(ws.content || '', true)
 }
 
-async function onToolbar(action: ToolbarAction) {
+async function onToolbar(action: any) {
   if (!ws.activePath) return
   if (action === 'link' && ws.editorMode === 'wysiwyg') {
     const url = await askPrompt({
@@ -430,10 +436,16 @@ onBeforeUnmount(() => {
             @click="onToolbar(item.id)"
           >
             <svg v-if="item.icon === 'h1'" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14M13 5v14M5 12h8M17 12v7M17 8.5V7" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" /></svg>
+            <svg v-else-if="item.icon === 'h2'" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14M12 5v14M5 12h7" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" /><path d="M16 9h3.2c1 0 1.8.7 1.8 1.7S20.2 12.4 19 12.4H16.8M16 19h5M16 12.4 19.8 19" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
             <svg v-else-if="item.icon === 'bold'" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h6.2a3.8 3.8 0 0 1 0 7.6H7V5Zm0 7.6h7.2A3.9 3.9 0 0 1 14.2 20H7v-7.4Z" fill="currentColor" /></svg>
             <svg v-else-if="item.icon === 'italic'" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h8M5 19h8M14.5 5 9.5 19" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" /></svg>
+            <svg v-else-if="item.icon === 'strike'" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M9 7.5c.8-1.4 2.2-2 3.8-2 2.2 0 3.7 1.1 3.7 2.8 0 1.1-.5 1.9-1.5 2.5M8.5 14.2c.4 1.8 2 3 4.2 3 2.4 0 4-1.3 4-3.1" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" /></svg>
+            <svg v-else-if="item.icon === 'code'" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            <svg v-else-if="item.icon === 'codeBlock'" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5h14v11H5z" stroke="currentColor" stroke-width="1.6" fill="none" /><path d="m9 10-2 2 2 2M15 10l2 2-2 2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
             <svg v-else-if="item.icon === 'list'" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7h11M9 12h11M9 17h11M5 7h.01M5 12h.01M5 17h.01" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" /></svg>
+            <svg v-else-if="item.icon === 'ol'" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7h10M10 12h10M10 17h10M5 7h2M5 12h2M5 17h2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" /></svg>
             <svg v-else-if="item.icon === 'task'" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 6.5h13v11h-13z" stroke="currentColor" stroke-width="1.6" fill="none" /><path d="m8.2 12.1 2.2 2.2 5-5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            <svg v-else-if="item.icon === 'quote'" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9h4v4H7zM13 9h4v4h-4zM7 13c0 2 1.2 3.5 3 4M13 13c0 2 1.2 3.5 3 4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" /></svg>
             <svg v-else-if="item.icon === 'link'" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a4 4 0 0 0 5.7.3l2.5-2.5a4 4 0 1 0-5.7-5.7l-1.3 1.3M14 10.5a4 4 0 0 0-5.7-.3l-2.5 2.5a4 4 0 1 0 5.7 5.7l1.2-1.2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" /></svg>
             <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v3M17 4v3M5 9h14M6.5 6.5h11A1.5 1.5 0 0 1 19 8v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19V8A1.5 1.5 0 0 1 6.5 6.5Z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" /><path d="M9 14h2v4H9z" fill="currentColor" /></svg>
           </button>
