@@ -1106,16 +1106,27 @@ input, textarea {
   padding: 8px 8px;
   cursor: pointer;
 }
-.gantt-quick-add {
+.gantt-compose-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  margin-top: 12px;
+  flex-shrink: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
 }
-.gantt-quick-add.bar {
-  padding: 12px 14px 4px;
-  border-top: 1px solid var(--line);
+.gantt-compose-bar .composer-input {
+  min-width: 120px;
+  flex: 1 1 160px;
+}
+.gantt-compose-bar .date-input {
+  flex: 0 0 auto;
+}
+.gantt-compose-hint {
+  margin: 0;
+  padding: 0 2px;
 }
 .todo-row.overdue {
   background: color-mix(in srgb, var(--danger-soft) 55%, var(--surface));
@@ -1151,8 +1162,41 @@ input, textarea {
 .gantt-empty {
   flex: 1;
   min-height: 0;
-  margin: 0;
+  margin: 0 auto;
+  max-width: 420px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 22px;
+  text-align: center;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  box-sizing: border-box;
   overflow: auto;
+}
+.gantt-empty .empty-title {
+  color: var(--ink);
+}
+.gantt-empty .empty-desc {
+  margin: 0;
+  max-width: 280px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.gantt-empty-mark {
+  display: grid;
+  place-items: center;
+  margin-bottom: 2px;
+}
+.gantt-empty-mark .workline-mini {
+  width: 36px;
+  height: 2px;
 }
 .gantt-today-line {
   position: absolute;
@@ -1179,13 +1223,6 @@ input, textarea {
   border-radius: 999px;
   padding: 2px 5px;
   white-space: nowrap;
-}
-.gantt-quick-add {
-  max-width: 100%;
-}
-.gantt-quick-add .composer-input {
-  min-width: 120px;
-  flex: 1 1 160px;
 }
 .composer {
   flex-shrink: 0;
@@ -3123,11 +3160,10 @@ select:focus-visible,
   .gantt-dates { max-height: none; overflow: visible; }
   .date-row { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
   .date-name { grid-column: 1 / -1; }
-  .gantt-quick-add,
-  .gantt-quick-add.bar,
+  .gantt-compose-bar,
   .composer-main,
   .composer-dates { display: grid; grid-template-columns: 1fr; }
-  .gantt-quick-add .date-sep,
+  .gantt-compose-bar .date-sep,
   .composer-dates .date-sep { justify-self: center; }
 }
 @media (max-width: 680px) {
@@ -3394,19 +3430,6 @@ select:focus-visible,
   font-size: 17px;
   font-weight: 600;
 }
-.gantt-view .gantt-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 28px 20px;
-}
-.gantt-view .gantt-quick-add {
-  width: min(100%, 720px);
-  justify-content: center;
-}
-
 .calendar-view .cal-toolbar {
   margin-bottom: 10px;
 }

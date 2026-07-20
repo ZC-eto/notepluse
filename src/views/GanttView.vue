@@ -117,6 +117,8 @@ const selectedEntry = computed(() => scheduledTasks.value.find((entry) => rowId(
 const ganttHelpText = '仅显示合法的跨日 @start + @end 执行区间和 @type(milestone) + @date；单日、截止和无日期任务不会伪装成进度条。选中任务后可在详情或日期栏中键盘编辑，不依赖拖拽。'
 const ganttEmptyHelpText = '请创建跨日执行区间，或在源码中定义带 @date 的里程碑。截止日期不属于甘特条。'
 const ganttWriteHelpText = '没有合法 Task Block 可写入；请在源码模式先创建显式任务块。'
+const taskBlockHowToText =
+  '在 Markdown 源码中用 HTML 注释包裹任务清单，例如：<!-- mdw:tasks id="sprint" name="迭代" color="violet" --> … - [ ] 事项 @start(2026-07-20) @end(2026-07-24) … <!-- /mdw:tasks -->。甘特仅投影块内合法区间与里程碑。'
 const excludedHelpText = computed(() =>
   excludedCount.value
     ? `已有 ${excludedCount.value} 条带日期任务未进入甘特：它们是单日/截止任务、缺少完整区间，或日期无效。请在日历或源码中查看。`
@@ -479,6 +481,10 @@ async function quickAdd() {
   }
 }
 
+function fillDemoSamples() {
+  void (ws as any).ensureDemoSamples?.()
+}
+
 function weekday(date: Date) {
   return ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
 }
@@ -509,26 +515,47 @@ onBeforeUnmount(cleanupDragListeners)
       <p v-if="scheduleMessage" class="view-alert" role="status">{{ scheduleMessage }}</p>
     </header>
 
-    <div v-if="!scheduledTasks.length" class="empty-state compact gantt-empty">
-      <div class="empty-icon" aria-hidden="true">▦</div>
+    <div v-if="hasTargets" class="gantt-compose-bar" aria-label="快速添加跨日任务">
+      <input
+        v-model="draftTitle"
+        class="composer-input"
+        :placeholder="scheduledTasks.length ? '继续添加跨日任务' : '跨日任务标题'"
+        @keyup.enter="quickAdd"
+      />
+      <input v-model="draftStart" class="date-input" type="date" aria-label="开始日期" />
+      <span class="date-sep" aria-hidden="true">→</span>
+      <input v-model="draftEnd" class="date-input" type="date" aria-label="结束日期" />
+      <select v-model="draftTargetKey" class="date-input" aria-label="新任务写入目标">
+        <option value="" disabled>选择笔记与任务组</option>
+        <option v-for="target in taskBlockTargets" :key="targetKey(target)" :value="targetKey(target)">
+          {{ target.folder ? `${target.folder} / ` : '' }}{{ target.noteName }} · {{ target.blockName }}
+        </option>
+      </select>
+      <button type="button" class="btn-solid" :disabled="!draftTitle.trim() || !selectedTarget" @click="quickAdd">添加</button>
+    </div>
+    <p v-else-if="scheduledTasks.length" class="composer-inline-help gantt-compose-hint">
+      <HelpTip :text="ganttWriteHelpText" label="写入目标说明" />
+      <span>需先有任务组</span>
+    </p>
+
+    <div v-if="!scheduledTasks.length" class="gantt-empty">
+      <div class="gantt-empty-mark" aria-hidden="true">
+        <span class="workline-mini" />
+      </div>
       <div class="empty-title-row">
         <div class="empty-title">暂无可绘制的排期</div>
         <HelpTip :text="ganttEmptyHelpText" label="空排期说明" />
       </div>
-      <div class="gantt-quick-add">
-        <input v-model="draftTitle" class="composer-input" :disabled="!hasTargets" placeholder="跨日任务标题" @keyup.enter="quickAdd" />
-        <input v-model="draftStart" class="date-input" :disabled="!hasTargets" type="date" aria-label="开始日期" />
-        <span class="date-sep" aria-hidden="true">→</span>
-        <input v-model="draftEnd" class="date-input" :disabled="!hasTargets" type="date" aria-label="结束日期" />
-        <select v-model="draftTargetKey" class="date-input" :disabled="!hasTargets" aria-label="新任务写入目标">
-          <option value="" disabled>选择笔记与 Task Block</option>
-          <option v-for="target in taskBlockTargets" :key="targetKey(target)" :value="targetKey(target)">
-            {{ target.folder ? `${target.folder} / ` : '' }}{{ target.noteName }} · {{ target.blockName }}
-          </option>
-        </select>
-        <button type="button" class="btn-solid" :disabled="!draftTitle.trim() || !selectedTarget" @click="quickAdd">添加</button>
-      </div>
-      <p v-if="!hasTargets" class="composer-inline-help"><HelpTip :text="ganttWriteHelpText" label="写入目标说明" /> <span>需先创建任务组</span></p>
+      <template v-if="!hasTargets">
+        <div class="empty-actions">
+          <button type="button" class="btn-solid" @click="fillDemoSamples">填充示例数据</button>
+        </div>
+        <p class="composer-inline-help">
+          <HelpTip :text="ganttWriteHelpText" label="写入目标说明" />
+          <span>需先有任务组</span>
+        </p>
+      </template>
+      <p v-else class="empty-desc">在上方填写标题与跨日区间即可添加。</p>
     </div>
 
     <template v-else>
@@ -630,21 +657,6 @@ onBeforeUnmount(cleanupDragListeners)
           <button type="button" class="btn-ghost danger" :disabled="!canWrite(selectedEntry.task)" @click="requestRemove(selectedEntry.task)">删除任务</button>
         </div>
       </div>
-
-      <div class="gantt-quick-add bar">
-        <input v-model="draftTitle" class="composer-input" :disabled="!hasTargets" placeholder="继续添加跨日任务" @keyup.enter="quickAdd" />
-        <input v-model="draftStart" class="date-input" :disabled="!hasTargets" type="date" aria-label="开始日期" />
-        <span class="date-sep" aria-hidden="true">→</span>
-        <input v-model="draftEnd" class="date-input" :disabled="!hasTargets" type="date" aria-label="结束日期" />
-        <select v-model="draftTargetKey" class="date-input" :disabled="!hasTargets" aria-label="新任务写入目标">
-          <option value="" disabled>选择笔记与 Task Block</option>
-          <option v-for="target in taskBlockTargets" :key="targetKey(target)" :value="targetKey(target)">
-            {{ target.folder ? `${target.folder} / ` : '' }}{{ target.noteName }} · {{ target.blockName }}
-          </option>
-        </select>
-        <button type="button" class="btn-solid" :disabled="!draftTitle.trim() || !selectedTarget" @click="quickAdd">添加</button>
-      </div>
-      <p v-if="!hasTargets" class="composer-inline-help"><HelpTip :text="ganttWriteHelpText" label="写入目标说明" /> <span>需先创建任务组</span></p>
     </template>
 
     <ConfirmDialog
