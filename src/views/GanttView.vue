@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import type { useWorkspace } from '../composables/useWorkspace'
 import type { GlobalTask, Task, TaskBlockTarget, TaskPatch } from '../core/types'
 import { displayTaskTitle } from '../core/taskSyntax'
@@ -49,6 +49,8 @@ const COLOR_HEX: Record<string, string> = {
 
 const drag = ref<DragState | null>(null)
 const draftMap = reactive<Record<string, { start?: string; end?: string }>>({})
+/** Skip the click that follows a drag so detail doesn't flash open/closed. */
+let suppressBarClick = false
 
 function isLocalDate(value?: string | null): value is string {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
@@ -238,12 +240,34 @@ function canWrite(task: TaskLike) {
   return task.isWritable === true
 }
 
-function selectEntry(entry: GanttEntry) {
-  selectedTaskKey.value = rowId(entry.task)
+function selectEntry(entry: GanttEntry, mode: 'open' | 'toggle' = 'toggle') {
+  if (mode === 'toggle' && suppressBarClick) {
+    suppressBarClick = false
+    return
+  }
+  const id = rowId(entry.task)
+  if (mode === 'open') {
+    selectedTaskKey.value = id
+    return
+  }
+  selectedTaskKey.value = selectedTaskKey.value === id ? null : id
+}
+
+function clearSelection() {
+  selectedTaskKey.value = null
 }
 
 function isEntrySelected(entry: GanttEntry) {
   return selectedTaskKey.value === rowId(entry.task)
+}
+
+function onGanttKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape') return
+  if (!selectedTaskKey.value) return
+  const target = event.target as HTMLElement | null
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')) return
+  event.preventDefault()
+  clearSelection()
 }
 
 function blockLabel(task: TaskLike) {
@@ -283,7 +307,7 @@ function entryAriaLabel(entry: GanttEntry) {
 function onEntryKeydown(entry: GanttEntry, event: KeyboardEvent) {
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
-    selectEntry(entry)
+    selectEntry(entry, 'toggle')
     return
   }
   if (!event.altKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return
@@ -389,8 +413,12 @@ function onPointerUp() {
   cleanupDragListeners()
   drag.value = null
   const id = rowId(state.entry.task)
-  if (state.draftStart !== state.originStart || state.draftEnd !== state.originEnd) {
+  const moved = state.draftStart !== state.originStart || state.draftEnd !== state.originEnd
+  if (moved) {
     commitRange(state.entry.task, state.draftStart, state.draftEnd)
+    // Drag gesture ends with a synthetic click — don't toggle the detail panel closed.
+    suppressBarClick = true
+    window.setTimeout(() => { suppressBarClick = false }, 0)
   }
   window.setTimeout(() => delete draftMap[id], 250)
 }
@@ -489,7 +517,14 @@ function weekday(date: Date) {
   return ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
 }
 
-onBeforeUnmount(cleanupDragListeners)
+onMounted(() => {
+  window.addEventListener('keydown', onGanttKeydown)
+})
+
+onBeforeUnmount(() => {
+  cleanupDragListeners()
+  window.removeEventListener('keydown', onGanttKeydown)
+})
 </script>
 
 <template>
@@ -600,11 +635,11 @@ onBeforeUnmount(cleanupDragListeners)
                   :aria-label="entryAriaLabel(entry)"
                   @click="selectEntry(entry)"
                   @keydown="onEntryKeydown(entry, $event)"
-                  @pointerdown="selectEntry(entry); onPointerDown(entry, 'move', $event)"
+                  @pointerdown="selectEntry(entry, 'open'); onPointerDown(entry, 'move', $event)"
                 >
-                  <span class="gantt-handle left" :aria-hidden="!canWrite(entry.task)" @pointerdown.stop="onPointerDown(entry, 'resize-start', $event)" />
+                  <span class="gantt-handle left" :aria-hidden="!canWrite(entry.task)" @pointerdown.stop="selectEntry(entry, 'open'); onPointerDown(entry, 'resize-start', $event)" />
                   <span class="gantt-bar-label">{{ displayTaskTitle(entry.task.title) }}</span>
-                  <span class="gantt-handle right" :aria-hidden="!canWrite(entry.task)" @pointerdown.stop="onPointerDown(entry, 'resize-end', $event)" />
+                  <span class="gantt-handle right" :aria-hidden="!canWrite(entry.task)" @pointerdown.stop="selectEntry(entry, 'open'); onPointerDown(entry, 'resize-end', $event)" />
                 </div>
                 <div v-else class="gantt-milestone" :class="{ selected: isEntrySelected(entry), 'is-readonly': !canWrite(entry.task) }" :style="barStyle(entry)" :title="barTitle(entry)" role="button" tabindex="0" :aria-label="entryAriaLabel(entry)" @click="selectEntry(entry)" @keydown="onEntryKeydown(entry, $event)" />
               </div>
@@ -636,24 +671,35 @@ onBeforeUnmount(cleanupDragListeners)
       </div>
     </div>
 
-    <template v-if="scheduledTasks.length">
-      <div class="gantt-dates" aria-label="键盘排期编辑">
-        <div v-for="entry in scheduledTasks" :key="`${rowId(entry.task)}-edit`" class="date-row" :class="{ 'is-readonly': !canWrite(entry.task), selected: isEntrySelected(entry) }" @click="selectEntry(entry)">
-          <button type="button" class="date-name" :title="barTitle(entry)" @click="selectEntry(entry)">{{ displayTaskTitle(entry.task.title) }}</button>
-          <template v-if="entry.kind === 'range'">
-            <input class="date-input" type="date" :disabled="!canWrite(entry.task)" :value="displayStart(entry.task)" aria-label="开始日期" @change="onRangeDateChange(entry.task, 'start', $event)" />
+    <template v-if="selectedEntry">
+      <div class="gantt-task-panel" role="region" aria-label="任务详情">
+        <div class="gantt-panel-head">
+          <strong class="gantt-panel-title">{{ displayTaskTitle(selectedEntry.task.title) }}</strong>
+          <button type="button" class="btn-ghost sm" @click="clearSelection">关闭</button>
+        </div>
+
+        <div class="gantt-panel-dates" :class="{ 'is-readonly': !canWrite(selectedEntry.task) }">
+          <template v-if="selectedEntry.kind === 'range'">
+            <label class="gantt-date-field">
+              <span>开始</span>
+              <input class="date-input" type="date" :disabled="!canWrite(selectedEntry.task)" :value="displayStart(selectedEntry.task)" aria-label="开始日期" @change="onRangeDateChange(selectedEntry.task, 'start', $event)" />
+            </label>
             <span class="date-sep" aria-hidden="true">→</span>
-            <input class="date-input" type="date" :disabled="!canWrite(entry.task)" :value="displayEnd(entry.task)" aria-label="结束日期" @change="onRangeDateChange(entry.task, 'end', $event)" />
+            <label class="gantt-date-field">
+              <span>结束</span>
+              <input class="date-input" type="date" :disabled="!canWrite(selectedEntry.task)" :value="displayEnd(selectedEntry.task)" aria-label="结束日期" @change="onRangeDateChange(selectedEntry.task, 'end', $event)" />
+            </label>
           </template>
           <template v-else>
             <span class="date-sep" aria-hidden="true">◆</span>
-            <input class="date-input" type="date" :disabled="!canWrite(entry.task)" :value="entry.task.date" aria-label="里程碑日期" @change="onMilestoneDateChange(entry.task, $event)" />
+            <label class="gantt-date-field">
+              <span>里程碑</span>
+              <input class="date-input" type="date" :disabled="!canWrite(selectedEntry.task)" :value="selectedEntry.task.date" aria-label="里程碑日期" @change="onMilestoneDateChange(selectedEntry.task, $event)" />
+            </label>
           </template>
-          <span v-if="!canWrite(entry.task)" class="status-chip muted">只读</span>
+          <span v-if="!canWrite(selectedEntry.task)" class="status-chip muted">只读</span>
         </div>
-      </div>
 
-      <div v-if="selectedEntry" class="gantt-task-panel">
         <TaskInspector
           :task="selectedEntry.task"
           :related-tasks="sourceTasks"
@@ -666,6 +712,7 @@ onBeforeUnmount(cleanupDragListeners)
         />
         <div class="gantt-task-panel-actions">
           <button type="button" class="btn-ghost danger" :disabled="!canWrite(selectedEntry.task)" @click="requestRemove(selectedEntry.task)">删除任务</button>
+          <button type="button" class="btn-ghost" @click="clearSelection">关闭详情</button>
         </div>
       </div>
     </template>

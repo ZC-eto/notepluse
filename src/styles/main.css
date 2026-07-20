@@ -677,12 +677,14 @@ input, textarea {
 }
 .todo-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0;
+  padding: 0;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
+  text-align: left;
 }
 .todo-row:last-child { border-bottom: 0; }
 .todo-row.done .todo-title {
@@ -692,13 +694,22 @@ input, textarea {
 .todo-main {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 10px;
   min-width: 0;
   flex: 1;
+  text-align: left;
 }
 .todo-title {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
   font-size: 14px;
-  font-weight: 550;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2419,25 +2430,46 @@ input, textarea {
   filter: brightness(1.05);
 }
 
-/* Todo progressive disclosure */
+/* Todo progressive disclosure — plain left list, not centered pills */
 .todo-row {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   gap: 0;
+  width: 100%;
+  text-align: left;
 }
 .todo-row-main {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 10px;
+  width: 100%;
   min-height: 40px;
+  padding: 10px 12px;
+  text-align: left;
 }
 .todo-row-main .todo-title {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
-  font-weight: 600;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+}
+.todo-row-main .todo-title:hover {
+  color: var(--accent-ink);
 }
 .todo-dot-overdue {
   width: 8px;
@@ -2447,18 +2479,22 @@ input, textarea {
   flex-shrink: 0;
 }
 .todo-row-detail {
-  padding: 0 0 10px 32px;
+  padding: 0 12px 12px 36px;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  flex-wrap: nowrap;
   gap: 8px;
-  align-items: center;
+  align-items: stretch;
+  text-align: left;
 }
 .todo-expand-btn {
+  flex: 0 0 auto;
   border: 0;
   background: transparent;
   color: var(--muted);
   font-size: 12px;
   padding: 4px 6px;
+  margin-left: auto;
 }
 .todo-expand-btn:hover { color: var(--ink); }
 
@@ -4225,4 +4261,137 @@ html.mini-mode body {
 }
 .todo-row-main {
   justify-content: flex-start;
+}
+
+/* ========================================================================== */
+/* v0.7.9 — todo left list + gantt detail-only dates (no always-on bottom)    */
+/* ========================================================================== */
+
+.todo-list {
+  text-align: left;
+}
+
+.todo-list .todo-row,
+.todo-list .todo-row-main {
+  display: flex !important;
+  width: 100% !important;
+  max-width: none !important;
+  text-align: left !important;
+}
+
+.todo-list .todo-row {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+}
+
+.todo-list .todo-row-main {
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  padding: 10px 12px !important;
+}
+
+/* Kill any accidental pill chrome on the title button */
+.todo-list .todo-title,
+.todo-list button.todo-title {
+  display: block !important;
+  flex: 1 1 auto !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--ink) !important;
+  font-weight: 500 !important;
+  text-align: left !important;
+  justify-self: start !important;
+  align-self: center !important;
+}
+
+.todo-list .todo-expand-btn {
+  margin-left: auto !important;
+  opacity: 0.72;
+}
+
+.todo-list .todo-row:hover .todo-expand-btn {
+  opacity: 1;
+}
+
+/* Gantt: never pin a full task-date roster under the board */
+.gantt-dates {
+  display: none !important;
+}
+
+.gantt-task-panel {
+  flex-shrink: 0;
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 94%, var(--surface-2));
+  box-shadow: var(--shadow);
+  overflow: auto;
+  max-height: min(46vh, 420px);
+}
+
+.gantt-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px 0;
+}
+
+.gantt-panel-title {
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gantt-panel-dates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 10px;
+  padding: 10px 12px 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+}
+
+.gantt-date-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.gantt-date-field .date-input {
+  min-width: 132px;
+}
+
+.gantt-task-panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.gantt-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Selected bar cue */
+.gantt-bar.selected,
+.gantt-milestone.selected {
+  outline: 2px solid color-mix(in srgb, var(--workline, var(--accent)) 70%, white);
+  outline-offset: 1px;
 }
