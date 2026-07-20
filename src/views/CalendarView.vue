@@ -4,10 +4,16 @@ import type { useWorkspace } from '../composables/useWorkspace'
 import type { GlobalTask, Task, TaskBlockTarget, TaskPatch } from '../core/types'
 import { displayTaskTitle } from '../core/taskSyntax'
 import ScopeSeg from '../components/ScopeSeg.vue'
+import HelpTip from '../components/HelpTip.vue'
 import TaskInspector from '../components/TaskInspector.vue'
 import { globalTaskKey } from '../core/globalTasks'
 
 const ws = inject('workspace') as ReturnType<typeof useWorkspace>
+
+const calendarHelpText = '○ 单日、⌄ 截止、— 执行区间 与 ◆ 里程碑 分别显示；截止日不会被当作执行条。单日、截止、执行区间和里程碑分别呈现；截止不是执行结束日期。'
+const calendarEmptyHelpText = '此范围内没有可投影的日期任务。普通 Markdown checklist 不会进入日历。'
+const calendarDayEmptyHelpText = '这一天没有来自合法 Task Block 的日程。'
+const calendarWriteHelpText = '当前工作区没有合法 Task Block；请在源码模式创建显式 mdw:tasks 容器后再新建任务。'
 const cursor = ref(new Date())
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日']
 const scope = ref<'current' | 'all'>('current')
@@ -291,23 +297,27 @@ function eventDateSummary(event: CalendarEvent) {
 
 <template>
   <div class="calendar-view">
-    <div class="cal-toolbar">
-      <div class="cal-nav">
-        <button type="button" class="btn-ghost" aria-label="上个月" @click="shiftMonth(-1)">上月</button>
-        <div class="cal-title" aria-live="polite">{{ monthLabel(cursor) }}</div>
-        <button type="button" class="btn-ghost" aria-label="下个月" @click="shiftMonth(1)">下月</button>
-        <button type="button" class="btn-solid" @click="goToday">今天</button>
+    <header class="view-toolbar cal-toolbar" aria-label="日历工具栏">
+      <div class="view-toolbar-primary">
+        <div class="cal-nav">
+          <button type="button" class="btn-ghost" aria-label="上个月" @click="shiftMonth(-1)">上月</button>
+          <div class="cal-title" aria-live="polite">{{ monthLabel(cursor) }}</div>
+          <button type="button" class="btn-ghost" aria-label="下个月" @click="shiftMonth(1)">下月</button>
+          <button type="button" class="btn-solid" @click="goToday">今天</button>
+        </div>
+        <div class="view-toolbar-cluster">
+          <ScopeSeg v-model="scope" :options="scopeOptions" aria-label="日历范围" />
+          <HelpTip :text="calendarHelpText" label="日历图例与语义说明" placement="left" />
+        </div>
       </div>
-      <ScopeSeg v-model="scope" :options="scopeOptions" aria-label="日历范围" />
-    </div>
-
-    <p class="view-semantic-hint">
-      <strong>○ 单日</strong>、<strong>⌄ 截止</strong>、<strong>— 执行区间</strong> 与 <strong>◆ 里程碑</strong> 分别显示；截止日不会被当作执行条。
-    </p>
+    </header>
 
     <div v-if="!calendarEvents.length" class="cal-banner">
-      <span>此范围内没有可投影的日期任务。普通 Markdown checklist 不会进入日历。</span>
-      <button type="button" class="btn-ghost sm" :disabled="!hasTargets" @click="openAdd(today)">为今天新建单日任务</button>
+      <div class="cal-banner-text">
+        <span>暂无日期任务</span>
+        <HelpTip :text="calendarEmptyHelpText" label="空日历说明" />
+      </div>
+      <button type="button" class="btn-ghost sm" :disabled="!hasTargets" @click="openAdd(today)">为今天新建</button>
     </div>
 
     <section class="cal-mobile-agenda" aria-label="移动端日程">
@@ -315,7 +325,7 @@ function eventDateSummary(event: CalendarEvent) {
         <label>查看日期 <input v-model="mobileDay" class="date-input" type="date" /></label>
         <button type="button" class="btn-ghost sm" :disabled="!hasTargets" @click="openAdd(mobileDay)">在这天新建</button>
       </div>
-      <p class="view-semantic-hint">单日、截止、执行区间和里程碑分别呈现；截止不是执行结束日期。</p>
+
       <div v-if="eventsForDay(mobileDay).length" class="cal-mobile-event-list">
         <button v-for="event in eventsForDay(mobileDay)" :key="event.key" type="button" class="cal-mobile-event" :class="[{ selected: selectedEventKey === event.key, done: event.task.done, 'is-readonly': !canWrite(event.task) }, `cal-task-${event.kind}`]" :style="eventStyle(event)" @click="selectEvent(event)">
           <span class="cal-mobile-event-kind">{{ eventKindLabel(event.kind) }}</span>
@@ -323,7 +333,7 @@ function eventDateSummary(event: CalendarEvent) {
           <span>{{ eventDateSummary(event) }}</span>
         </button>
       </div>
-      <div v-else class="empty-state compact"><div class="empty-desc">这一天没有来自合法 Task Block 的日程。</div></div>
+      <div v-else class="empty-state compact day-empty"><div class="empty-title-row"><div class="empty-desc">这天没有日程</div><HelpTip :text="calendarDayEmptyHelpText" label="空日程说明" /></div></div>
     </section>
 
     <div class="cal-board">
@@ -396,10 +406,14 @@ function eventDateSummary(event: CalendarEvent) {
         </select>
         <button type="button" class="btn-solid" :disabled="!composeTitle.trim() || !selectedTarget" @click="submitAdd">添加</button>
       </div>
-      <p class="cal-compose-tip">
-        <template v-if="hasTargets">将写入所选 Task Block：<code>- [ ] 标题 @date({{ composeDay }})</code></template>
-        <template v-else>当前工作区没有合法 Task Block；请在源码模式创建显式 <code>mdw:tasks</code> 容器后再新建任务。</template>
-      </p>
+      <div class="composer-inline-help">
+        <HelpTip
+          :text="hasTargets ? ('将写入所选 Task Block：- [ ] 标题 @date(' + composeDay + ')') : calendarWriteHelpText"
+          label="写入说明"
+        />
+        <span v-if="hasTargets">写入 @date({{ composeDay }})</span>
+        <span v-else>需先创建任务组</span>
+      </div>
     </div>
 
     <div v-if="selectedEvent" class="cal-task-panel">

@@ -4,7 +4,7 @@
   "title": "Markdown 工作台",
   "description": "本地 Markdown 工作台：文件夹·全局待办·甘特/日历·设置与撤销",
   "author": "ZTools Plugin",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "main": "index.html",
   "preload": "preload/services.js",
   "logo": "logo.png",

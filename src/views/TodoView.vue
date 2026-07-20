@@ -4,6 +4,7 @@ import type { useWorkspace } from '../composables/useWorkspace'
 import type { GlobalTask, Task, TaskBlockTarget, TaskKind, TaskPatch, TaskPriority } from '../core/types'
 import { displayTaskTitle, hasSchedule, isTodayFocus } from '../core/taskSyntax'
 import ScopeSeg from '../components/ScopeSeg.vue'
+import HelpTip from '../components/HelpTip.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import TaskInspector from '../components/TaskInspector.vue'
 import { globalTaskKey } from '../core/globalTasks'
@@ -52,6 +53,36 @@ const isDraftScheduleValid = computed(() => {
   return !!draftStart.value && !!draftEnd.value && draftStart.value <= draftEnd.value
 })
 const canAddDraft = computed(() => !!draft.value.trim() && hasWritableTarget.value && isDraftScheduleValid.value)
+
+const scopeHelpText = computed(() => {
+  if (scope.value === 'inbox') return '收件箱只显示无完整日期语义的未完成任务；它们不会被当作“今天”。'
+  if (scope.value === 'today') return '今日显示单日、进行中区间，以及今天到期或已逾期的截止项；截止日不会被当作执行结束日。'
+  if (scope.value === 'upcoming') return '即将到来显示未来 14 天的单日、开始或截止承诺。'
+  return '全部只汇总任务组中的事项；普通勾选清单不会出现在这里。'
+})
+
+const emptyTitle = computed(() => {
+  if (scope.value === 'inbox') return '收件箱为空'
+  if (scope.value === 'today') return '今日暂无待办'
+  if (scope.value === 'upcoming') return '未来 14 天暂无待办'
+  return '尚未声明可管理任务'
+})
+
+const emptyHelpText = computed(() =>
+  taskBlockTargets.value.length
+    ? '选择目标笔记与任务组后即可新建任务。普通勾选清单不会自动进待办。'
+    : '先在源码中插入一个任务组；普通勾选清单不会自动进待办。'
+)
+
+const composerHelpText = computed(() => {
+  if (!taskBlockTargets.value.length) {
+    return '没有可写的任务组。请在源码中创建合法的任务组后再返回这里。'
+  }
+  if (!hasWritableTarget.value) {
+    return '请选择要写入的笔记和任务组；不会自动创建计划文档或追加到文末。'
+  }
+  return '任务会写入左侧所选笔记与任务组。可用下方选项设置排期语义（@date / @due / @start+@end）、类型与优先级。'
+})
 
 const scopeOptions = computed(() => [
   { id: 'inbox', label: '收件箱', title: '未排期的未完成任务，不等于今天必须处理', count: inboxTasks.value.length || undefined },
@@ -364,34 +395,36 @@ async function openSource(task: GlobalTask) {
 
 <template>
   <div class="todo-view">
-    <div class="todo-toolbar">
-      <div class="todo-progress" :aria-label="`当前范围完成 ${stats.done}/${stats.total}`">
-        <div class="progress-track" aria-hidden="true">
-          <div class="progress-fill" :style="{ width: progress + '%' }" />
+    <header class="view-toolbar" aria-label="待办工具栏">
+      <div class="view-toolbar-primary">
+        <div class="todo-progress" :aria-label="`当前范围完成 ${stats.done}/${stats.total}`">
+          <div class="progress-track" aria-hidden="true">
+            <div class="progress-fill" :style="{ width: progress + '%' }" />
+          </div>
+          <span class="progress-label">{{ stats.done }}/{{ stats.total }}</span>
         </div>
-        <span class="progress-label">{{ stats.done }}/{{ stats.total }}</span>
+
+        <div class="view-toolbar-cluster">
+          <ScopeSeg v-model="scope" :options="scopeOptions" aria-label="待办范围" />
+          <HelpTip :text="scopeHelpText" label="当前范围说明" placement="left" />
+          <div class="filter-seg" role="group" aria-label="完成状态筛选">
+            <button type="button" class="seg-btn" :class="{ active: filter === 'all' }" @click="filter = 'all'">全部</button>
+            <button type="button" class="seg-btn" :class="{ active: filter === 'open' }" @click="filter = 'open'">未完成</button>
+            <button type="button" class="seg-btn" :class="{ active: filter === 'done' }" @click="filter = 'done'">已完成</button>
+          </div>
+        </div>
       </div>
 
-      <div v-if="scope === 'today'" class="today-summary" aria-label="今日任务摘要">
+      <div
+        v-if="scope === 'today' && (todaySummary.overdue || todaySummary.active || todaySummary.dueToday)"
+        class="today-summary"
+        aria-label="今日任务摘要"
+      >
         <span v-if="todaySummary.overdue" class="sum-chip danger">截止逾期 {{ todaySummary.overdue }}</span>
         <span v-if="todaySummary.active" class="sum-chip">进行中 / 单日 {{ todaySummary.active }}</span>
         <span v-if="todaySummary.dueToday" class="sum-chip">今日截止 {{ todaySummary.dueToday }}</span>
       </div>
-
-      <ScopeSeg v-model="scope" :options="scopeOptions" aria-label="待办范围" />
-      <p class="view-semantic-hint">
-        <template v-if="scope === 'inbox'">收件箱只显示无完整日期语义的未完成任务；它们不会被当作“今天”。</template>
-        <template v-else-if="scope === 'today'">今日显示单日、进行中区间，以及今天到期或已逾期的截止项；截止日不会被当作执行结束日。</template>
-        <template v-else-if="scope === 'upcoming'">即将到来显示未来 14 天的单日、开始或截止承诺。</template>
-        <template v-else>全部只汇总任务组中的事项；普通勾选清单不会出现在这里。</template>
-      </p>
-
-      <div class="filter-seg" role="group" aria-label="完成状态筛选">
-        <button type="button" class="seg-btn" :class="{ active: filter === 'all' }" @click="filter = 'all'">全部</button>
-        <button type="button" class="seg-btn" :class="{ active: filter === 'open' }" @click="filter = 'open'">未完成</button>
-        <button type="button" class="seg-btn" :class="{ active: filter === 'done' }" @click="filter = 'done'">已完成</button>
-      </div>
-    </div>
+    </header>
 
     <div v-if="allTags.length || allBlocks.length" class="tag-filter" aria-label="任务属性筛选">
       <button type="button" class="tag-chip" :class="{ active: !tagFilter && !priorityFilter && !blockFilter }" @click="clearFilters">清除筛选</button>
@@ -410,16 +443,18 @@ async function openSource(task: GlobalTask) {
     </div>
 
     <div v-if="emptyKind === 'scope'" class="empty-state compact todo-empty">
-      <div class="empty-title">{{ scope === 'inbox' ? '收件箱为空' : scope === 'today' ? '今日暂无待办' : scope === 'upcoming' ? '未来 14 天暂无待办' : '尚未声明可管理任务' }}</div>
-      <div class="empty-desc">
-        {{ taskBlockTargets.length ? '选择目标笔记与任务组后即可新建任务。' : '先在源码中插入一个任务组；普通勾选清单不会自动进待办。' }}
+      <div class="empty-title-row">
+        <div class="empty-title">{{ emptyTitle }}</div>
+        <HelpTip :text="emptyHelpText" label="空状态说明" />
       </div>
       <button v-if="taskBlockTargets.length" type="button" class="btn-solid" @click="focusComposer">新建任务</button>
     </div>
 
     <div v-else-if="emptyKind === 'filtered'" class="empty-state compact todo-empty">
-      <div class="empty-title">当前筛选无结果</div>
-      <div class="empty-desc">可清除标签、优先级、任务组或完成状态筛选。</div>
+      <div class="empty-title-row">
+        <div class="empty-title">当前筛选无结果</div>
+        <HelpTip text="可清除标签、优先级、任务组或完成状态筛选。" label="筛选说明" />
+      </div>
       <button type="button" class="btn-ghost" @click="clearFilters">清除筛选</button>
     </div>
 
@@ -489,6 +524,10 @@ async function openSource(task: GlobalTask) {
     />
 
     <section class="composer" aria-label="新建任务">
+      <div class="composer-head">
+        <span class="composer-label">新建任务</span>
+        <HelpTip :text="composerHelpText" label="新建任务说明" placement="left" />
+      </div>
       <div class="composer-main">
         <select v-model="selectedTargetKey" class="date-input" aria-label="目标笔记和任务组">
           <option value="">选择目标笔记 / 任务组</option>
@@ -501,15 +540,18 @@ async function openSource(task: GlobalTask) {
           v-model="draft"
           class="composer-input"
           :disabled="!hasWritableTarget"
-          placeholder="输入任务标题，目标位置由左侧选择器决定"
+          placeholder="输入任务标题"
           @keyup.enter="add"
         />
         <button type="button" class="btn-solid" :disabled="!canAddDraft" @click="add">添加</button>
       </div>
-      <p v-if="!taskBlockTargets.length" class="view-semantic-hint">没有可写的任务组。请在源码中创建合法的任务组后再返回这里。</p>
-      <p v-else-if="!hasWritableTarget" class="view-semantic-hint">请选择要写入的笔记和任务组；不会自动创建计划文档或追加到文末。</p>
       <div class="composer-dates">
-        <select v-model="draftScheduleKind" class="date-input" aria-label="任务日期语义">
+        <select
+          v-model="draftScheduleKind"
+          class="date-input"
+          aria-label="任务日期语义"
+          title="未排期（收件箱） / 单日安排 @date / 截止日期 @due / 执行区间 @start + @end"
+        >
           <option value="none">未排期（收件箱）</option>
           <option value="date">单日安排 @date</option>
           <option value="due">截止日期 @due</option>
@@ -534,10 +576,8 @@ async function openSource(task: GlobalTask) {
           <option value="low">低</option>
         </select>
       </div>
-      <p v-if="draftScheduleKind === 'range' && draftStart && draftEnd && draftStart > draftEnd" class="view-semantic-hint">结束日期不能早于开始日期；请修正后再添加，系统不会自动交换日期。</p>
-      <p v-if="draftType === 'milestone' && draftScheduleKind !== 'date'" class="view-semantic-hint">里程碑应使用 <code>@type(milestone)</code> + <code>@date</code>；请选择“单日安排”。</p>
+      <p v-if="draftScheduleKind === 'range' && draftStart && draftEnd && draftStart > draftEnd" class="view-alert" role="alert">结束日期不能早于开始日期；请修正后再添加，系统不会自动交换日期。</p>
+      <p v-if="draftType === 'milestone' && draftScheduleKind !== 'date'" class="view-alert" role="alert">里程碑应使用 @type(milestone) + @date；请选择“单日安排”。</p>
     </section>
   </div>
 </template>
-
-

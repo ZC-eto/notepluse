@@ -4,9 +4,12 @@ import { onBeforeUnmount, ref } from 'vue'
 const props = defineProps<{
   text: string
   label?: string
+  /** 气泡相对位置：默认靠右下方 */
+  placement?: 'left' | 'right' | 'center'
 }>()
 
 const open = ref(false)
+const tipId = `help-tip-${Math.random().toString(36).slice(2, 10)}`
 let closeTimer: ReturnType<typeof setTimeout> | null = null
 
 function show() {
@@ -52,12 +55,12 @@ onBeforeUnmount(() => {
 <template>
   <span
     class="help-tip"
-    :class="{ open }"
+    :class="[open ? 'open' : '', `place-${props.placement || 'right'}`]"
     role="button"
     tabindex="0"
     :aria-label="props.label || '帮助说明'"
     :aria-expanded="open"
-    :aria-describedby="open ? 'help-tip-pop' : undefined"
+    :aria-describedby="open ? tipId : undefined"
     @mouseenter="show"
     @mouseleave="hideSoon"
     @focus="show"
@@ -67,7 +70,7 @@ onBeforeUnmount(() => {
     <span class="help-tip-icon" aria-hidden="true">?</span>
     <span
       v-if="open"
-      id="help-tip-pop"
+      :id="tipId"
       class="help-tip-pop"
       role="tooltip"
       @mouseenter="show"

@@ -4,6 +4,7 @@ import type { useWorkspace } from '../composables/useWorkspace'
 import type { GlobalTask, Task, TaskBlockTarget, TaskPatch } from '../core/types'
 import { displayTaskTitle } from '../core/taskSyntax'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
+import HelpTip from '../components/HelpTip.vue'
 import ScopeSeg from '../components/ScopeSeg.vue'
 import TaskInspector from '../components/TaskInspector.vue'
 import { globalTaskKey } from '../core/globalTasks'
@@ -112,6 +113,15 @@ const sourceTasks = computed(() => (scope.value === 'all' ? allTasks.value : cur
 const scheduledTasks = computed<GanttEntry[]>(() => sourceTasks.value.map(toEntry).filter((entry): entry is GanttEntry => entry !== null))
 const selectedEntry = computed(() => scheduledTasks.value.find((entry) => rowId(entry.task) === selectedTaskKey.value) || null)
 
+
+const ganttHelpText = '仅显示合法的跨日 @start + @end 执行区间和 @type(milestone) + @date；单日、截止和无日期任务不会伪装成进度条。选中任务后可在详情或日期栏中键盘编辑，不依赖拖拽。'
+const ganttEmptyHelpText = '请创建跨日执行区间，或在源码中定义带 @date 的里程碑。截止日期不属于甘特条。'
+const ganttWriteHelpText = '没有合法 Task Block 可写入；请在源码模式先创建显式任务块。'
+const excludedHelpText = computed(() =>
+  excludedCount.value
+    ? `已有 ${excludedCount.value} 条带日期任务未进入甘特：它们是单日/截止任务、缺少完整区间，或日期无效。请在日历或源码中查看。`
+    : ''
+)
 const excludedCount = computed(() => sourceTasks.value.filter((task) => {
   const hasAnyTiming = Boolean(task.date || task.due || task.start || task.end)
   return hasAnyTiming && !toEntry(task)
@@ -478,21 +488,33 @@ onBeforeUnmount(cleanupDragListeners)
 
 <template>
   <div class="gantt-view">
-    <div class="gantt-toolbar">
-      <div>
-        <h2 class="gantt-title">排期</h2>
-        <p class="view-semantic-hint">仅显示合法的跨日 <code>@start + @end</code> 执行区间和 <code>@type(milestone) + @date</code>；单日、截止和无日期任务不会伪装成进度条。选中任务后可在详情或日期栏中键盘编辑，不依赖拖拽。</p>
+    <header class="view-toolbar gantt-toolbar" aria-label="甘特工具栏">
+      <div class="view-toolbar-primary">
+        <div class="view-title-row">
+          <h2 class="gantt-title">排期</h2>
+          <HelpTip :text="ganttHelpText" label="甘特视图说明" />
+          <span
+            v-if="excludedCount"
+            class="status-chip"
+            :title="excludedHelpText"
+          >
+            未投影 {{ excludedCount }}
+            <HelpTip :text="excludedHelpText" label="未进入甘特的任务说明" />
+          </span>
+        </div>
+        <div class="view-toolbar-cluster">
+          <ScopeSeg v-model="scope" :options="scopeOptions" aria-label="甘特范围" />
+        </div>
       </div>
-      <ScopeSeg v-model="scope" :options="scopeOptions" aria-label="甘特范围" />
-    </div>
-
-    <p v-if="excludedCount" class="view-semantic-hint">已有 {{ excludedCount }} 条带日期任务未进入甘特：它们是单日/截止任务、缺少完整区间，或日期无效。请在日历或源码中查看。</p>
-    <p v-if="scheduleMessage" class="view-semantic-hint" role="status">{{ scheduleMessage }}</p>
+      <p v-if="scheduleMessage" class="view-alert" role="status">{{ scheduleMessage }}</p>
+    </header>
 
     <div v-if="!scheduledTasks.length" class="empty-state compact gantt-empty">
       <div class="empty-icon" aria-hidden="true">▦</div>
-      <div class="empty-title">暂无可绘制的排期</div>
-      <div class="empty-desc">请创建跨日执行区间，或在源码中定义带 <code>@date</code> 的里程碑。截止日期不属于甘特条。</div>
+      <div class="empty-title-row">
+        <div class="empty-title">暂无可绘制的排期</div>
+        <HelpTip :text="ganttEmptyHelpText" label="空排期说明" />
+      </div>
       <div class="gantt-quick-add">
         <input v-model="draftTitle" class="composer-input" :disabled="!hasTargets" placeholder="跨日任务标题" @keyup.enter="quickAdd" />
         <input v-model="draftStart" class="date-input" :disabled="!hasTargets" type="date" aria-label="开始日期" />
@@ -506,7 +528,7 @@ onBeforeUnmount(cleanupDragListeners)
         </select>
         <button type="button" class="btn-solid" :disabled="!draftTitle.trim() || !selectedTarget" @click="quickAdd">添加</button>
       </div>
-      <p v-if="!hasTargets" class="view-semantic-hint">没有合法 Task Block 可写入；请在源码模式先创建显式任务块。</p>
+      <p v-if="!hasTargets" class="composer-inline-help"><HelpTip :text="ganttWriteHelpText" label="写入目标说明" /> <span>需先创建任务组</span></p>
     </div>
 
     <template v-else>
@@ -589,7 +611,7 @@ onBeforeUnmount(cleanupDragListeners)
             <span class="date-sep" aria-hidden="true">◆</span>
             <input class="date-input" type="date" :disabled="!canWrite(entry.task)" :value="entry.task.date" aria-label="里程碑日期" @change="onMilestoneDateChange(entry.task, $event)" />
           </template>
-          <span v-if="!canWrite(entry.task)" class="view-semantic-hint">只读</span>
+          <span v-if="!canWrite(entry.task)" class="status-chip muted">只读</span>
         </div>
       </div>
 
@@ -622,7 +644,7 @@ onBeforeUnmount(cleanupDragListeners)
         </select>
         <button type="button" class="btn-solid" :disabled="!draftTitle.trim() || !selectedTarget" @click="quickAdd">添加</button>
       </div>
-      <p v-if="!hasTargets" class="view-semantic-hint">没有合法 Task Block 可写入；请在源码模式先创建显式任务块。</p>
+      <p v-if="!hasTargets" class="composer-inline-help"><HelpTip :text="ganttWriteHelpText" label="写入目标说明" /> <span>需先创建任务组</span></p>
     </template>
 
     <ConfirmDialog
