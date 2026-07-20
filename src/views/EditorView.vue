@@ -19,6 +19,7 @@ const sourceText = ref('')
 const sourceEl = ref<HTMLTextAreaElement | null>(null)
 const wysiwygEl = ref<HTMLElement | null>(null)
 const diagnosticsOpen = ref(false)
+const toolbarMoreOpen = ref(false)
 const taskBlockCount = computed(() => ws.taskBlocks.length)
 const taskDiagnosticCount = computed(() => ws.taskDiagnostics.length)
 let syncing = false
@@ -39,6 +40,8 @@ type ToolbarItem = {
   icon: string
 }
 
+const primaryToolbarIds = new Set(['h1', 'bold', 'italic', 'list', 'task', 'link', 'date'])
+
 const toolbarItems: ToolbarItem[] = [
   { id: 'h1', label: 'H1', title: '一级标题 Ctrl+Alt+1', group: 'text', icon: 'h1' },
   { id: 'h2', label: 'H2', title: '二级标题 Ctrl+Alt+2', group: 'text', icon: 'h2' },
@@ -55,15 +58,8 @@ const toolbarItems: ToolbarItem[] = [
   { id: 'date', label: '今日', title: '插入今天日期', group: 'insert', icon: 'date' },
 ]
 
-const toolbarGroups = computed(() => {
-  const order: ToolbarItem['group'][] = ['text', 'list', 'insert']
-  return order
-    .map((group) => ({
-      group,
-      items: toolbarItems.filter((item) => item.group === group),
-    }))
-    .filter((g) => g.items.length)
-})
+const primaryToolbarItems = computed(() => toolbarItems.filter((item) => primaryToolbarIds.has(item.id)))
+const moreToolbarItems = computed(() => toolbarItems.filter((item) => !primaryToolbarIds.has(item.id)))
 
 function resetHistory(seed: string, path: string) {
   if (historyTimer) {
@@ -422,34 +418,25 @@ onBeforeUnmount(() => {
     </div>
 
     <template v-else>
-      <div class="editor-toolbar" role="toolbar" aria-label="编辑工具条">
-        <template v-for="(group, gIdx) in toolbarGroups" :key="group.group">
-          <span v-if="gIdx > 0" class="editor-tool-sep" aria-hidden="true" />
-          <button
-            v-for="item in group.items"
-            :key="item.id"
-            type="button"
-            class="editor-tool-btn is-icon"
-            :title="item.title"
-            :aria-label="item.title"
-            @mousedown.prevent
-            @click="onToolbar(item.id)"
-          >
-            <svg v-if="item.icon === 'h1'" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14M13 5v14M5 12h8M17 12v7M17 8.5V7" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" /></svg>
-            <svg v-else-if="item.icon === 'h2'" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14M12 5v14M5 12h7" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" /><path d="M16 9h3.2c1 0 1.8.7 1.8 1.7S20.2 12.4 19 12.4H16.8M16 19h5M16 12.4 19.8 19" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
-            <svg v-else-if="item.icon === 'bold'" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h6.2a3.8 3.8 0 0 1 0 7.6H7V5Zm0 7.6h7.2A3.9 3.9 0 0 1 14.2 20H7v-7.4Z" fill="currentColor" /></svg>
-            <svg v-else-if="item.icon === 'italic'" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h8M5 19h8M14.5 5 9.5 19" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" /></svg>
-            <svg v-else-if="item.icon === 'strike'" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M9 7.5c.8-1.4 2.2-2 3.8-2 2.2 0 3.7 1.1 3.7 2.8 0 1.1-.5 1.9-1.5 2.5M8.5 14.2c.4 1.8 2 3 4.2 3 2.4 0 4-1.3 4-3.1" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" /></svg>
-            <svg v-else-if="item.icon === 'code'" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
-            <svg v-else-if="item.icon === 'codeBlock'" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5h14v11H5z" stroke="currentColor" stroke-width="1.6" fill="none" /><path d="m9 10-2 2 2 2M15 10l2 2-2 2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
-            <svg v-else-if="item.icon === 'list'" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7h11M9 12h11M9 17h11M5 7h.01M5 12h.01M5 17h.01" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" /></svg>
-            <svg v-else-if="item.icon === 'ol'" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7h10M10 12h10M10 17h10M5 7h2M5 12h2M5 17h2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" /></svg>
-            <svg v-else-if="item.icon === 'task'" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 6.5h13v11h-13z" stroke="currentColor" stroke-width="1.6" fill="none" /><path d="m8.2 12.1 2.2 2.2 5-5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
-            <svg v-else-if="item.icon === 'quote'" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9h4v4H7zM13 9h4v4h-4zM7 13c0 2 1.2 3.5 3 4M13 13c0 2 1.2 3.5 3 4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" /></svg>
-            <svg v-else-if="item.icon === 'link'" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a4 4 0 0 0 5.7.3l2.5-2.5a4 4 0 1 0-5.7-5.7l-1.3 1.3M14 10.5a4 4 0 0 0-5.7-.3l-2.5 2.5a4 4 0 1 0 5.7 5.7l1.2-1.2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" /></svg>
-            <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v3M17 4v3M5 9h14M6.5 6.5h11A1.5 1.5 0 0 1 19 8v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19V8A1.5 1.5 0 0 1 6.5 6.5Z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" /><path d="M9 14h2v4H9z" fill="currentColor" /></svg>
-          </button>
-        </template>
+            <div class="editor-toolbar" role="toolbar" aria-label="编辑工具条">
+        <button
+          v-for="item in primaryToolbarItems"
+          :key="item.id"
+          type="button"
+          class="editor-tool-btn is-icon"
+          :title="item.title"
+          :aria-label="item.title"
+          @mousedown.prevent
+          @click="onToolbar(item.id)"
+        >
+          <svg v-if="item.icon === 'h1'" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14M13 5v14M5 12h8M17 12v7M17 8.5V7" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" /></svg>
+          <svg v-else-if="item.icon === 'bold'" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h6.2a3.8 3.8 0 0 1 0 7.6H7V5Zm0 7.6h7.2A3.9 3.9 0 0 1 14.2 20H7v-7.4Z" fill="currentColor" /></svg>
+          <svg v-else-if="item.icon === 'italic'" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h8M5 19h8M14.5 5 9.5 19" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" /></svg>
+          <svg v-else-if="item.icon === 'list'" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7h11M9 12h11M9 17h11M5 7h.01M5 12h.01M5 17h.01" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" /></svg>
+          <svg v-else-if="item.icon === 'task'" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 6.5h13v11h-13z" stroke="currentColor" stroke-width="1.6" fill="none" /><path d="m8.2 12.1 2.2 2.2 5-5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          <svg v-else-if="item.icon === 'link'" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a4 4 0 0 0 5.7.3l2.5-2.5a4 4 0 1 0-5.7-5.7l-1.3 1.3M14 10.5a4 4 0 0 0-5.7-.3l-2.5 2.5a4 4 0 1 0 5.7 5.7l1.2-1.2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" /></svg>
+          <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v3M17 4v3M5 9h14M6.5 6.5h11A1.5 1.5 0 0 1 19 8v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19V8A1.5 1.5 0 0 1 6.5 6.5Z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" /><path d="M9 14h2v4H9z" fill="currentColor" /></svg>
+        </button>
         <span class="editor-tool-sep" aria-hidden="true" />
         <button
           type="button"
@@ -458,40 +445,53 @@ onBeforeUnmount(() => {
           aria-label="插入任务组 Ctrl+Alt+T"
           @mousedown.prevent
           @click="insertTaskBlock"
-        >
-          任务组
+        >任务组</button>
+        <span class="editor-tool-sep" aria-hidden="true" />
+        <button type="button" class="editor-tool-btn is-icon" title="撤销 Ctrl+Z" aria-label="撤销 Ctrl+Z" @mousedown.prevent @click="ws.editorMode === 'source' ? applySourceAction('undo') : applyWysiwygAction('undo')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8H4v4M4.5 12A7.5 7.5 0 1 0 7 6.4" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </button>
+        <button type="button" class="editor-tool-btn is-icon" title="重做 Ctrl+Y" aria-label="重做 Ctrl+Y" @mousedown.prevent @click="ws.editorMode === 'source' ? applySourceAction('redo') : applyWysiwygAction('redo')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8h4v4M19.5 12A7.5 7.5 0 1 1 17 6.4" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </button>
         <span class="editor-tool-sep" aria-hidden="true" />
         <button
           type="button"
-          class="editor-tool-btn is-icon"
-          title="撤销 Ctrl+Z"
-          aria-label="撤销 Ctrl+Z"
+          class="editor-tool-btn sm-label"
+          :aria-expanded="toolbarMoreOpen"
+          title="更多格式"
           @mousedown.prevent
-          @click="ws.editorMode === 'source' ? applySourceAction('undo') : applyWysiwygAction('undo')"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8H4v4M4.5 12A7.5 7.5 0 1 0 7 6.4" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
-        </button>
+          @click="toolbarMoreOpen = !toolbarMoreOpen"
+        >{{ toolbarMoreOpen ? '收起' : '更多' }}</button>
+      </div>
+      <div v-if="toolbarMoreOpen" class="editor-toolbar is-more" role="toolbar" aria-label="更多编辑格式">
         <button
+          v-for="item in moreToolbarItems"
+          :key="item.id"
           type="button"
           class="editor-tool-btn is-icon"
-          title="重做 Ctrl+Y"
-          aria-label="重做 Ctrl+Y"
+          :title="item.title"
+          :aria-label="item.title"
           @mousedown.prevent
-          @click="ws.editorMode === 'source' ? applySourceAction('redo') : applyWysiwygAction('redo')"
+          @click="onToolbar(item.id)"
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8h4v4M19.5 12A7.5 7.5 0 1 1 17 6.4" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          <svg v-if="item.icon === 'h2'" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14M12 5v14M5 12h7" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" /><path d="M16 9h3.2c1 0 1.8.7 1.8 1.7S20.2 12.4 19 12.4H16.8M16 19h5M16 12.4 19.8 19" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          <svg v-else-if="item.icon === 'strike'" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M9 7.5c.8-1.4 2.2-2 3.8-2 2.2 0 3.7 1.1 3.7 2.8 0 1.1-.5 1.9-1.5 2.5M8.5 14.2c.4 1.8 2 3 4.2 3 2.4 0 4-1.3 4-3.1" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" /></svg>
+          <svg v-else-if="item.icon === 'code'" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          <svg v-else-if="item.icon === 'codeBlock'" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5h14v11H5z" stroke="currentColor" stroke-width="1.6" fill="none" /><path d="m9 10-2 2 2 2M15 10l2 2-2 2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          <svg v-else-if="item.icon === 'ol'" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7h10M10 12h10M10 17h10M5 7h2M5 12h2M5 17h2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" /></svg>
+          <svg v-else-if="item.icon === 'quote'" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9h4v4H7zM13 9h4v4h-4zM7 13c0 2 1.2 3.5 3 4M13 13c0 2 1.2 3.5 3 4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" /></svg>
+          <span v-else class="editor-tool-fallback">{{ item.label }}</span>
         </button>
       </div>
 
-      <section
+<section
         v-if="taskDiagnosticCount > 0"
         class="task-block-status"
         aria-label="任务问题"
       >
         <div class="task-block-status-summary">
-          <span class="has-diagnostics">{{ taskDiagnosticCount }} 个问题</span>
-          <span v-if="taskBlockCount" class="task-block-meta">任务组 {{ taskBlockCount }}</span>
+          <span class="has-diagnostics">任务组结构需修复 · {{ taskDiagnosticCount }}</span>
+          <span v-if="taskBlockCount" class="task-block-meta">共 {{ taskBlockCount }} 组</span>
         </div>
         <button
           type="button"
@@ -499,8 +499,9 @@ onBeforeUnmount(() => {
           :aria-expanded="diagnosticsOpen"
           @click="diagnosticsOpen = !diagnosticsOpen"
         >
-          {{ diagnosticsOpen ? '收起' : '查看' }}
+          {{ diagnosticsOpen ? '收起' : '定位源码' }}
         </button>
+        <p v-if="diagnosticsOpen" class="task-diagnostic-hint">点击下列项会切换到源码并跳到对应行。修好注释边界或 @id 后保存即可。</p>
         <div v-if="diagnosticsOpen" class="task-diagnostic-list" role="list">
           <button
             v-for="diagnostic in ws.taskDiagnostics"

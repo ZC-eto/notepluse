@@ -230,6 +230,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             </div>
           </section>
 
+          <details class="settings-advanced">
+            <summary class="settings-advanced-summary">高级</summary>
+            <div class="settings-advanced-body">
           <section class="settings-block">
             <h3 class="settings-block-title">
               示例数据
@@ -292,6 +295,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             </div>
             <p class="settings-foot">当前：{{ syncLabel }}。请在 ZTools 设置中登录/开启同步后，再评估云复制状态。</p>
           </section>
+            </div>
+          </details>
         </div>
       </div>
     </div>

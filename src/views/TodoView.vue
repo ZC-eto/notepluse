@@ -190,7 +190,19 @@ function sourceLabel(task: GlobalTask): string {
 
 function blockLabel(task: GlobalTask): string {
   const target = taskBlockTargets.value.find((item) => item.notePath === task.notePath && item.blockId === task.blockId)
-  return target?.blockName || task.blockId
+  const block = target?.blockName || task.blockId
+  const note = task.noteName || target?.noteName || ''
+  return note ? `${note} · ${block}` : block
+}
+
+function priorityLabel(priority?: TaskPriority | null): string {
+  if (!priority) return ''
+  return ({ urgent: '紧急', high: '高', medium: '中', low: '低' } as const)[priority]
+}
+
+function taskColorCss(color?: string | null): string {
+  if (!color) return 'var(--workline, var(--accent))'
+  return `var(--task-${color}, var(--workline, var(--accent)))`
 }
 
 function headingLabel(task: Task): string {
@@ -548,6 +560,7 @@ async function openSource(task: GlobalTask) {
         <option :value="null">所有任务组</option>
         <option v-for="block in allBlocks" :key="block.key" :value="block.key">{{ block.label }}</option>
       </select>
+      <span class="tag-filter-hint">标签/优先级在任务「详情 → 编辑属性」写入 Markdown</span>
     </div>
 
     <div v-if="emptyKind === 'scope'" class="empty-state compact todo-empty">
@@ -556,12 +569,12 @@ async function openSource(task: GlobalTask) {
         <HelpTip :text="emptyHelpText" label="空状态说明" />
       </div>
       <template v-if="!taskBlockTargets.length">
-        <p class="empty-desc">待办只聚合任务组中的事项。可先填充示例体验，或在源码中自行声明任务组。</p>
+        <p class="empty-desc">待办只聚合任务组中的事项。标签与优先级写在任务属性里（Markdown 行上），不是单独数据库。</p>
         <div class="empty-actions">
-          <button type="button" class="btn-solid" :disabled="seeding" @click="seedSamples">
+          <button type="button" class="btn-solid" @click="goInsertTaskBlock">在当前笔记插入任务组</button>
+          <button type="button" class="btn-ghost" :disabled="seeding" @click="seedSamples">
             {{ seeding ? '正在填充…' : '填充示例数据' }}
           </button>
-          <button type="button" class="btn-ghost" @click="goInsertTaskBlock">去源码插入任务组</button>
           <span class="composer-inline-help">
             <HelpTip :text="taskBlockHowToText" label="如何写任务组" />
             <span>如何写任务组</span>
@@ -655,7 +668,14 @@ async function openSource(task: GlobalTask) {
         }"
         :style="{ '--task-depth': task.depth, '--task-color': task.color || 'var(--accent)' }"
       >
-        <div class="todo-row-main" :style="{ paddingInlineStart: `${Math.min(task.depth, 5) * 16}px` }">
+        <div
+          class="todo-row-main"
+          :style="{
+            paddingInlineStart: `${Math.min(task.depth, 5) * 16}px`,
+            '--task-color': taskColorCss(task.color),
+          }"
+        >
+          <span class="todo-workline" aria-hidden="true" />
           <input
             type="checkbox"
             :checked="task.done"
@@ -673,6 +693,11 @@ async function openSource(task: GlobalTask) {
             :aria-expanded="isExpanded(task)"
             @click="toggleExpand(task)"
           >{{ displayTaskTitle(task.title) }}</button>
+          <span class="todo-meta-chips" aria-hidden="false">
+            <span v-if="task.priority" class="todo-chip is-priority" :data-priority="task.priority" :title="'优先级 ' + priorityLabel(task.priority)">{{ priorityLabel(task.priority) }}</span>
+            <span v-for="tag in task.tags.slice(0, 3)" :key="tag" class="todo-chip is-tag">#{{ tag }}</span>
+            <span v-if="task.tags.length > 3" class="todo-chip is-more">+{{ task.tags.length - 3 }}</span>
+          </span>
           <button type="button" class="todo-expand-btn" :aria-label="`${isExpanded(task) ? '收起' : '展开'} ${displayTaskTitle(task.title)} 的详情`" @click="toggleExpand(task)">
             {{ isExpanded(task) ? '收起' : '详情' }}
           </button>
