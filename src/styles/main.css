@@ -568,35 +568,52 @@ input, textarea {
   padding: 0.05em 0.35em;
 }
 
+/* Base task chrome — always left-aligned document checklist, never centered pills */
 .task-list {
   list-style: none;
-  margin: 1em 0;
+  margin: 0.85em 0;
   padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--surface-2);
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
 }
 .task-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 2px;
+  padding: 7px 10px 7px 8px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
 }
 .task-item:last-child { border-bottom: 0; }
 .task-row {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
   min-width: 0;
+  text-align: left;
 }
-.task-title { outline: none; font-weight: 550; }
+.task-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  outline: none;
+  font-weight: 500;
+  text-align: left;
+  line-height: 1.45;
+}
 .task-meta {
   color: var(--muted);
   font-size: 12px;
   white-space: nowrap;
+  text-align: left;
 }
 
 /* ===== Todo ===== */
@@ -2241,69 +2258,115 @@ input, textarea {
 
 
 /* Visible source anchors preserve managed Task Block boundaries in visual editing. */
-.wysiwyg-editor .task-block-boundary {
+.wysiwyg-editor .task-block-boundary,
+.md-body .task-block-boundary {
   display: flex;
   align-items: center;
-  min-height: 28px;
-  margin: 10px 0;
-  padding: 0 10px;
-  border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line));
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--accent) 7%, var(--surface-2));
-  color: var(--accent-ink);
+  justify-content: flex-start;
+  min-height: 26px;
+  margin: 14px 0 8px;
+  padding: 0 0 0 10px;
+  border: 0;
+  border-left: 2px solid color-mix(in srgb, var(--workline, var(--accent)) 70%, var(--line));
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
   user-select: none;
+  text-align: left;
 }
-.wysiwyg-editor .task-block-boundary-label {
+.wysiwyg-editor .task-block-boundary-label,
+.md-body .task-block-boundary-label {
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .03em;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  font-family: var(--mono);
+  color: var(--faint);
+  text-align: left;
 }
-.wysiwyg-editor .task-block-boundary:focus-visible {
+.wysiwyg-editor .task-block-boundary:focus-visible,
+.md-body .task-block-boundary:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* task-item div layout (avoid li merge in contenteditable) */
+/* task-item div layout (avoid li merge in contenteditable) — document checklist, left flush */
 .md-body .task-list,
 .wysiwyg-editor .task-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 0.75em 0;
-  padding: 0;
+  align-items: stretch;
+  gap: 0;
+  margin: 0.45em 0 0.9em;
+  padding: 2px 0;
   list-style: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
 }
 .md-body .task-item,
 .wysiwyg-editor .task-item {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--line);
+  align-items: stretch; /* critical: column + center would horizontally center the row */
+  justify-content: flex-start;
+  gap: 2px;
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px 8px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  transition: background 0.12s ease;
+}
+.md-body .task-item:hover,
+.wysiwyg-editor .task-item:hover {
+  background: color-mix(in srgb, var(--surface-2) 88%, transparent);
+}
+.md-body .task-item[data-task='done'] .task-title,
+.wysiwyg-editor .task-item[data-task='done'] .task-title {
+  color: var(--muted);
+  text-decoration: line-through;
+  font-weight: 450;
 }
 .md-body .task-row,
 .wysiwyg-editor .task-row {
   display: flex;
   align-items: flex-start;
+  justify-content: flex-start;
   gap: 10px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+.md-body .task-row input[type='checkbox'],
+.wysiwyg-editor .task-row input[type='checkbox'] {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin: 3px 0 0;
+  accent-color: var(--workline, var(--accent));
+  cursor: pointer;
 }
 .md-body .task-title,
 .wysiwyg-editor .task-title {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   outline: none;
-  line-height: 1.45;
-  font-weight: 600;
+  line-height: 1.5;
+  font-weight: 500;
+  text-align: left;
+  word-break: break-word;
 }
 .md-body .task-meta,
 .wysiwyg-editor .task-meta {
   font-size: 11px;
   color: var(--faint);
   font-family: var(--mono);
-  padding-left: 28px;
+  padding-left: 25px;
   user-select: none;
+  text-align: left;
 }
 .md-body .task-meta[hidden],
 .wysiwyg-editor .task-meta[hidden] {
@@ -4025,4 +4088,141 @@ html.mini-mode body {
 .todo-view .progress-label {
   color: var(--faint);
   font-weight: 600;
+}
+
+/* ========================================================================== */
+/* v0.7.8 — kill centered task chrome; document checklist left-flush         */
+/* ========================================================================== */
+
+/* Force checklist rows left even if older rules reintroduce center alignment */
+.wysiwyg-editor,
+.md-body {
+  text-align: left;
+}
+
+.wysiwyg-editor .task-list,
+.md-body .task-list,
+.task-list {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  text-align: left !important;
+  border: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.wysiwyg-editor .task-item,
+.md-body .task-item,
+.task-item {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important; /* column + center was centering the whole row */
+  justify-content: flex-start !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  text-align: left !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding-left: 4px !important;
+  padding-right: 8px !important;
+}
+
+.wysiwyg-editor .task-item:hover,
+.md-body .task-item:hover {
+  background: color-mix(in srgb, var(--surface-2) 90%, transparent) !important;
+}
+
+.wysiwyg-editor .task-row,
+.md-body .task-row,
+.task-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  text-align: left !important;
+  gap: 10px !important;
+}
+
+.wysiwyg-editor .task-title,
+.md-body .task-title,
+.task-title {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  max-width: none !important;
+  text-align: left !important;
+  justify-self: start !important;
+  margin: 0 !important;
+  font-weight: 500 !important;
+}
+
+.wysiwyg-editor .task-row input[type='checkbox'],
+.md-body .task-row input[type='checkbox'],
+.task-row input[type='checkbox'] {
+  flex: 0 0 auto !important;
+  margin: 3px 0 0 !important;
+}
+
+/* Task block markers: thin left rail, not dashed full-width pill */
+.wysiwyg-editor .task-block-boundary,
+.md-body .task-block-boundary {
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 12px 0 6px !important;
+  padding: 2px 0 2px 10px !important;
+  border: 0 !important;
+  border-left: 2px solid color-mix(in srgb, var(--workline, var(--accent)) 65%, var(--line)) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  text-align: left !important;
+  box-shadow: none !important;
+}
+
+.wysiwyg-editor .task-block-boundary-label,
+.md-body .task-block-boundary-label {
+  text-align: left !important;
+  width: auto !important;
+  margin: 0 !important;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: var(--faint) !important;
+}
+
+/* Headings / body stay document-left (never centered title block) */
+.wysiwyg-editor h1,
+.wysiwyg-editor h2,
+.wysiwyg-editor h3,
+.wysiwyg-editor p,
+.md-body h1,
+.md-body h2,
+.md-body h3,
+.md-body p {
+  text-align: left;
+}
+
+/* Todo list rows also stay left (defensive) */
+.todo-list .todo-row,
+.todo-row-main,
+.todo-title {
+  text-align: left;
+}
+.todo-row-main {
+  justify-content: flex-start;
 }
