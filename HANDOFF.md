@@ -1,43 +1,19 @@
-# Handoff: 稿笺（Garben）v0.8.6 品牌更名
+# Handoff: 稿笺 v0.8.7 UI 减噪
 
 ## Session Metadata
-- Created: 2026-07-21
-- Project (权威源码): `D:\Code\ZTools_Plugin\md-workspace`（磁盘目录名暂未改）
+- Project: `D:\Code\ZTools_Plugin\md-workspace`
+- Version: **0.8.7** · plugin id `garben` · title **稿笺**
+- Zip: `release/garben-v0.8.7.zip`
 - Branch: `master`
-- 当前版本: **0.8.6**
-- 插件 ID: **`garben`**
-- 展示名: **稿笺**
-- 安装包: `D:\Code\ZTools_Plugin\md-workspace\release\garben-v0.8.6.zip`
-- Goal: 用户级可上线；**缺真机冒烟签字前不要 mark complete**
 
-## Brand
-| 项 | 值 |
-|----|-----|
-| 中文名 | 稿笺 |
-| 英文 / 技术 ID | garben |
-| 搜索词 | md / 笔记 / markdown / 稿笺 / garben |
-| 配置文件 | `garben-config.json`（自动从 `md-workspace-config.json` 迁移） |
-| 默认笔记目录 | `文档/GarbenNotes`（已有 `ZToolsNotes` 可在设置中继续指向） |
-| 侧栏标记 | 「笺」 |
-| 小窗标题 | 稿笺 · 今日 |
+## What landed (design-critique)
+1. **待办**：范围 + 未完成/已完成/全部 + 迷你进度；「筛选」「添加」折叠；今日摘要仅逾期相关；行详情改为「···」
+2. **顶栏**：投影视图隐藏排版/源码、编辑器帮助、保存（脏稿/失败时仍显示）
+3. **甘特**：有列表时折叠 compose；空态展开
+4. **日历**：「＋」默认隐藏，hover / 今日 / 焦点显示
+5. **视觉**：rail「笺」用 accent 色；逾期 workline 加强
+6. **设计系统**文档更名稿笺
 
-## Immediate Next Steps
-1. 真机导入 `release\garben-v0.8.6.zip`（新 ID，会显示为新插件「稿笺」）
-2. 可卸掉旧的「Markdown 工作台 / md-workspace」避免双份
-3. 若有旧设置：启动时会读 legacy 配置并写入 `garben-config.json`
-4. 若有旧笔记在 `ZToolsNotes`：设置 → 选择该目录即可
-
-## Work Completed (v0.8.6)
-- [x] 更名 稿笺 / garben 全用户可见面
-- [x] plugin.json name/title/cmds/open-file label
-- [x] 配置迁移 + 默认目录名
-- [x] 小窗/引导/设置文案
-- [x] test:core 48；pack garben-v0.8.6.zip
-
-## Potential Gotchas
-- 磁盘仓库夹仍叫 `md-workspace`，仅品牌与插件 ID 变了
-- `package-lock` name 已对齐；历史 docs 里仍可能出现旧名
-- Task Block 注释仍是 `mdw:tasks`（语法 ID，勿改，否则旧笔记失效）
-
----
-Next: 真机导入 0.8.6 冒烟；确认标题栏显示「稿笺」。
+## Next
+- 真机导入 0.8.7 冒烟
+- 可选：设置弹层遮罩时避免与视图叠字；统一 focus ring
