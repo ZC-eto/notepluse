@@ -37,10 +37,15 @@ const allViewMeta: {
   title: string
   icon: 'editor' | 'todo' | 'gantt' | 'calendar'
 }[] = [
-  { id: 'editor', label: '笔记', title: '笔记（Ctrl+1；双击打开笔记库；右键新建）', icon: 'editor' },
-  { id: 'todo', label: '待办', title: '待办（Ctrl+2）', icon: 'todo' },
-  { id: 'gantt', label: '甘特', title: '甘特（Ctrl+3）', icon: 'gantt' },
-  { id: 'calendar', label: '日历', title: '日历（Ctrl+4）', icon: 'calendar' },
+  {
+    id: 'editor',
+    label: '笔记',
+    title: '笔记 · Ctrl+1 · 双击打开笔记库 · 右键新建',
+    icon: 'editor',
+  },
+  { id: 'todo', label: '待办', title: '待办 · Ctrl+2', icon: 'todo' },
+  { id: 'gantt', label: '甘特', title: '甘特 · Ctrl+3', icon: 'gantt' },
+  { id: 'calendar', label: '日历', title: '日历 · Ctrl+4', icon: 'calendar' },
 ]
 
 const viewMeta = computed(() => {
@@ -51,18 +56,6 @@ const viewMeta = computed(() => {
     'calendar',
   ]
   return allViewMeta.filter((v) => enabled.includes(v.id))
-})
-
-const viewLabels = computed(() =>
-  Object.fromEntries(allViewMeta.map((v) => [v.id, v.label])) as Record<AppView, string>
-)
-
-const workspaceState = computed(() => {
-  if (ws.saving) return '保存中…'
-  if (ws.saveError || ws.status === '保存失败') return '保存失败'
-  if (ws.dirty) return '未保存'
-  if (ws.activePath) return '已保存'
-  return ''
 })
 
 function applyPluginHeight() {
@@ -387,7 +380,7 @@ onBeforeUnmount(() => {
   >
     <nav class="work-rail" aria-label="诺麦笔记导航">
       <div class="rail-signature" title="诺麦笔记" aria-label="诺麦笔记">
-        <span class="rail-mark" aria-hidden="true">诺</span>
+        <span class="rail-mark" aria-hidden="true">N</span>
       </div>
 
       <div class="rail-nav">
@@ -406,23 +399,23 @@ onBeforeUnmount(() => {
           @contextmenu.prevent="onRailContext(v.id, $event)"
         >
           <span class="rail-icon" aria-hidden="true">
-            <!-- 清晰 SVG，避免 CSS 伪图标重叠错乱 -->
             <svg v-if="v.icon === 'editor'" viewBox="0 0 24 24">
-              <path d="M6 4.5h8.5L18 8v11.5H6z" fill="none" stroke="currentColor" stroke-width="1.7" />
-              <path d="M14 4.5V8h3.5M8.5 12h7M8.5 15.5h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              <path d="M6 4.5h8.5L18 8v11.5H6z" fill="none" stroke="currentColor" stroke-width="1.6" />
+              <path d="M14 4.5V8h3.5M8.5 12h7M8.5 15.5h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
             </svg>
             <svg v-else-if="v.icon === 'todo'" viewBox="0 0 24 24">
-              <rect x="4.5" y="4.5" width="15" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.7" />
-              <path d="m8 12 2.6 2.6L16.5 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              <rect x="4.5" y="4.5" width="15" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6" />
+              <path d="m8 12 2.6 2.6L16.5 9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             <svg v-else-if="v.icon === 'gantt'" viewBox="0 0 24 24">
-              <path d="M5 6h8M5 12h12M5 18h6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+              <path d="M5 6h8M5 12h12M5 18h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
             </svg>
             <svg v-else viewBox="0 0 24 24">
-              <rect x="4.5" y="5.5" width="15" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.7" />
-              <path d="M4.5 9.5h15M9 5.5v3M15 5.5v3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              <rect x="4.5" y="5.5" width="15" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" />
+              <path d="M4.5 9.5h15M9 5.5v3M15 5.5v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
             </svg>
           </span>
+          <!-- label only for a11y trees / screen readers; visually hidden via CSS -->
           <span class="rail-label">{{ v.label }}</span>
         </button>
       </div>
@@ -452,15 +445,6 @@ onBeforeUnmount(() => {
         <GanttView v-else-if="ws.view === 'gantt'" />
         <CalendarView v-else />
       </div>
-      <footer
-        v-if="workspaceState"
-        class="workspace-status"
-        aria-live="polite"
-      >
-        <span class="status-workline" aria-hidden="true" />
-        <span class="workspace-status-label">{{ viewLabels[ws.view] }}</span>
-        <span class="workspace-status-copy">{{ workspaceState }}</span>
-      </footer>
     </main>
 
     <ConfirmDialog

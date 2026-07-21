@@ -469,8 +469,8 @@ onBeforeUnmount(() => {
       <p class="empty-desc">
         {{
           ws.isEmptyWorkspace
-            ? '点「新建笔记」开始。需要待办时再插入任务组。'
-            : '点左上角「笔记库」切换多篇，或新建。'
+            ? 'Ctrl+N 新建，或双击左侧「笔记」打开库。'
+            : '点左上角库图标，或双击左侧「笔记」打开笔记库。'
         }}
       </p>
       <div class="empty-actions">

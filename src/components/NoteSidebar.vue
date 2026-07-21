@@ -42,10 +42,6 @@ const filteredGroups = computed(() => {
   return sorted.filter((g) => g.notes.length > 0 || g.label.toLowerCase().includes(key))
 })
 
-const totalVisible = computed(() =>
-  filteredGroups.value.reduce((sum, g) => sum + g.notes.length, 0)
-)
-
 function sortNotes(notes: NoteMeta[]): NoteMeta[] {
   const dir = sortDir.value === 'asc' ? 1 : -1
   return notes.slice().sort((a, b) => {
@@ -223,56 +219,34 @@ onBeforeUnmount(() => {
 <template>
   <aside id="note-library" class="sidebar" aria-label="笔记库" @contextmenu="openBlankCtx">
     <div class="sidebar-top">
-      <div class="brand-row">
-        <div class="brand-text">
-          <div class="brand-name">笔记库</div>
-          <div class="brand-sub">{{ totalVisible }}</div>
-        </div>
+      <div class="sidebar-search">
+        <label class="sr-only" for="note-search">搜索笔记</label>
+        <span class="search-glyph" aria-hidden="true" />
+        <input id="note-search" v-model="q" class="search-input" type="search" placeholder="搜索" />
       </div>
       <div class="sidebar-top-actions">
+        <button
+          class="icon-action"
+          type="button"
+          :title="`排序：${sortLabel()}，点击切换字段`"
+          :aria-label="`排序 ${sortLabel()}`"
+          @click="setSortField(sortField === 'name' ? 'mtime' : 'name')"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h12M8 12h8M8 17h4M5 7v.01M5 12v.01M5 17v.01" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" /></svg>
+        </button>
         <button class="icon-action" type="button" title="新建文件夹" aria-label="新建文件夹" @click="onNewFolder">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5h6l1.7 2H20a1 1 0 0 1 1 1v8.8a1.7 1.7 0 0 1-1.7 1.7H4.7A1.7 1.7 0 0 1 3 18.3V7a.5.5 0 0 1 .5-.5Zm13 6v5m-2.5-2.5h5" /></svg>
         </button>
         <button
           class="icon-action primary"
           type="button"
-          title="在当前文件夹新建笔记（Ctrl+N）"
-          aria-label="在当前文件夹新建笔记"
+          title="新建笔记 · Ctrl+N"
+          aria-label="新建笔记"
           @click="ws.createNote()"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
         </button>
       </div>
-    </div>
-
-    <div class="sidebar-search">
-      <label class="sr-only" for="note-search">搜索笔记</label>
-      <span class="search-glyph" aria-hidden="true" />
-      <input id="note-search" v-model="q" class="search-input" type="search" placeholder="搜索" />
-    </div>
-
-    <div class="sidebar-sort" role="group" aria-label="排序">
-      <button
-        type="button"
-        class="sort-chip"
-        :class="{ active: sortField === 'name' }"
-        :title="sortField === 'name' ? `名称${sortDir === 'asc' ? '升序' : '降序'}，再点切换方向` : '按名称排序'"
-        @click="setSortField('name')"
-      >名称</button>
-      <button
-        type="button"
-        class="sort-chip"
-        :class="{ active: sortField === 'mtime' }"
-        :title="sortField === 'mtime' ? `时间${sortDir === 'asc' ? '升序' : '降序'}，再点切换方向` : '按修改时间排序'"
-        @click="setSortField('mtime')"
-      >时间</button>
-      <button
-        type="button"
-        class="sort-dir"
-        :title="`当前 ${sortLabel()}，点击切换升/降序`"
-        :aria-label="`排序方向 ${sortDir === 'asc' ? '升序' : '降序'}`"
-        @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'"
-      >{{ sortDir === 'asc' ? '↑' : '↓' }}</button>
     </div>
 
     <div v-if="!ws.notes.length" class="onboard-card">
