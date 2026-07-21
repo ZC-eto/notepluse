@@ -123,23 +123,36 @@ function onRetrySave() {
 
       <span
         v-if="saveLabel"
-        class="save-pill"
-        :class="[saveLabel.kind, { 'is-quiet': !showSaveAction && saveLabel.kind === 'ok' }]"
+        class="save-state-icon"
+        :class="saveLabel.kind"
         :title="saveLabel.detail || saveLabel.text"
         role="status"
+        :aria-label="saveLabel.text"
       >
-        <span class="save-state-dot" aria-hidden="true" />
-        <span v-if="showSaveAction || saveLabel.kind !== 'ok'" class="save-state-text">{{ saveLabel.text }}</span>
+        <!-- check = saved; disc = dirty/saving; ! = error -->
+        <svg v-if="saveLabel.kind === 'ok'" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <path d="m8.5 12.2 2.3 2.3 4.7-4.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <svg v-else-if="saveLabel.kind === 'warn' || saveLabel.kind === 'muted'" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <path d="M12 8v5M12 15.5v.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+        </svg>
+        <svg v-else viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <path d="M12 8v5M12 15.5v.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+        </svg>
       </span>
       <button
         v-if="ws.saveError || ws.status === '保存失败'"
         type="button"
-        class="btn-ghost sm save-retry-btn"
+        class="icon-action save-retry-icon"
         :disabled="ws.saving || !canRetrySave"
-        title="重新保存当前笔记"
+        title="重新保存"
+        aria-label="重新保存"
         @click="onRetrySave"
       >
-        重试
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h6a5 5 0 1 1-1.5 9.8M7 7V4m0 3 2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
       </button>
       <button
         v-if="showSaveAction && (ws.dirty || ws.saving)"

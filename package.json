@@ -1,6 +1,6 @@
 {
   "name": "notepluse",
-  "version": "0.9.10-quiet",
+  "version": "0.9.12-quiet",
   "description": "诺麦笔记（NotePluse）：本地 Markdown 笔记 + 任务组驱动的待办/甘特/日历",
   "type": "module",
   "scripts": {

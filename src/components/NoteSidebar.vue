@@ -435,7 +435,6 @@ onBeforeUnmount(() => {
               <span class="note-dot" aria-hidden="true" />
               <span class="note-main">
                 <span class="note-name">{{ titleOf(note.name) }}</span>
-                <span class="note-mtime">{{ fmtMtime(note.mtime) }}</span>
               </span>
             </button>
           </article>
