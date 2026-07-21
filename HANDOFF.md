@@ -1,25 +1,25 @@
-# Handoff: 墨记（Garben）v0.8.8
-
-## Session Metadata
-- Project: `D:\Code\ZTools_Plugin\md-workspace`
-- Version: **0.8.8** · plugin id `garben` · title **墨记**
-- Zip: `release/garben-v0.8.8.zip`
-- Branch: `master` @ `81488e2`
+# Handoff: 诺麦笔记 v0.8.9
 
 ## Brand
 | 项 | 值 |
 |----|-----|
-| 中文名 | **墨记** |
-| 技术 ID | `garben`（未改，配置/数据路径不变） |
-| 侧栏字标 | **记** |
-| 搜索词 | 墨记 / garben / md / 笔记 |
-| 小窗 | 墨记 · 今日 |
+| 中文名 | **诺麦笔记** |
+| 英文别名 | NotePluse / notepluse |
+| 技术 ID | `garben`（配置路径不变） |
+| 侧栏字标 | **诺** |
+| Zip | `release/garben-v0.8.9.zip` |
 
-## Recent
-- v0.8.7：UI 减噪（待办/日历/甘特/顶栏）
-- v0.8.8：展示名 稿笺 → 墨记（仅中文，id 仍为 garben）
+## Fixes
+1. **日历详情可滚动**：`.cal-task-panel` overflow-y auto + max-height
+2. **笔记库缝隙**：打开时三栏 + column-gap 10px，库卡片圆角描边
+3. **单击/双击/右键笔记**：
+   - 单击：切到笔记视图（不自动开库）
+   - 双击：开笔记库
+   - 右键：菜单「新建笔记 / 新建文件夹 / 打开笔记库」
+4. 切到待办/甘特/日历时自动收起笔记库
+
+## Note on 示例笔记
+笔记视图仍可能显示「快速开始 / 示例-待办甘特」等——来自磁盘/示例填充，不是 UI 假数据。可在笔记库删除，或设置里不要再点「填充示例」。
 
 ## Next
-1. 真机导入 `release/garben-v0.8.8.zip`
-2. 确认宿主标题为「墨记」
-3. 若仍拗口可再换二字名（不改 garben id）
+真机导入 0.8.9 验证日历滚动、双击开库、右键菜单、标题「诺麦笔记」。

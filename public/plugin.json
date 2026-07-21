@@ -1,10 +1,10 @@
 {
   "$schema": "../node_modules/@ztools-center/ztools-api-types/resource/ztools.schema.json",
   "name": "garben",
-  "title": "墨记",
+  "title": "诺麦笔记",
   "description": "本地 Markdown 笔记与任务：文件夹 · 待办 · 甘特 · 日历",
   "author": "ZTools Plugin",
-  "version": "0.8.8",
+  "version": "0.8.9",
   "main": "index.html",
   "preload": "preload/services.js",
   "logo": "logo.png",
@@ -14,14 +14,17 @@
   "features": [
     {
       "code": "workspace",
-      "explain": "打开墨记",
+      "explain": "打开诺麦笔记",
       "icon": "logo.png",
       "cmds": [
         "md",
         "笔记",
         "markdown",
-        "墨记",
-        "garben"
+        "诺麦笔记",
+        "诺麦",
+        "garben",
+        "notepluse",
+        "NotePluse"
       ]
     },
     {
@@ -53,7 +56,7 @@
     },
     {
       "code": "open-file",
-      "explain": "用墨记打开 Markdown 文件",
+      "explain": "用诺麦笔记打开 Markdown 文件",
       "icon": "logo.png",
       "cmds": [
         {
@@ -64,7 +67,7 @@
             "md",
             "markdown"
           ],
-          "label": "用墨记打开"
+          "label": "用诺麦笔记打开"
         }
       ]
     }

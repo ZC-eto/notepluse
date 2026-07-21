@@ -37,7 +37,7 @@ const allViewMeta: {
   title: string
   icon: 'editor' | 'todo' | 'gantt' | 'calendar'
 }[] = [
-  { id: 'editor', label: '笔记', title: '笔记（Ctrl+1；双击打开笔记库）', icon: 'editor' },
+  { id: 'editor', label: '笔记', title: '笔记（Ctrl+1；双击打开笔记库；右键新建）', icon: 'editor' },
   { id: 'todo', label: '待办', title: '待办（Ctrl+2）', icon: 'todo' },
   { id: 'gantt', label: '甘特', title: '甘特（Ctrl+3）', icon: 'gantt' },
   { id: 'calendar', label: '日历', title: '日历（Ctrl+4）', icon: 'calendar' },
@@ -103,14 +103,57 @@ function selectView(view: AppView) {
   // 单击导航只切视图，不自动弹出笔记库（双击笔记才开库）
 }
 
-/** 双击「笔记」：打开笔记库并挤压主画布（非覆盖） */
+/**
+ * 单击：切换视图（不自动开库）。
+ * 双击「笔记」：切到笔记并打开笔记库。
+ * 右键「笔记」：打开库内新建菜单（见 onRailContext）。
+ */
 function onRailActivate(view: AppView, ev: MouseEvent) {
-  if (view === 'editor' && ev.detail >= 2) {
-    selectView('editor')
-    libraryOpen.value = true
+  // 双击序列里的第二次 click 交给 onRailDblClick，避免重复开库
+  if (view === 'editor' && ev.detail >= 2) return
+  selectView(view)
+  // 切到非笔记视图时收起库，避免占宽度；笔记单击只切视图
+  if (view !== 'editor') libraryOpen.value = false
+}
+
+function onRailDblClick(view: AppView, ev: MouseEvent) {
+  ev.preventDefault()
+  if (view !== 'editor') {
+    selectView(view)
     return
   }
-  selectView(view)
+  selectView('editor')
+  libraryOpen.value = true
+}
+
+const railCtx = ref<{ x: number; y: number } | null>(null)
+
+function onRailContext(view: AppView, ev: MouseEvent) {
+  if (view !== 'editor') return
+  ev.preventDefault()
+  selectView('editor')
+  libraryOpen.value = true
+  railCtx.value = { x: ev.clientX, y: ev.clientY }
+}
+
+function closeRailCtx() {
+  railCtx.value = null
+}
+
+async function railCtxNewNote() {
+  closeRailCtx()
+  libraryOpen.value = true
+  selectView('editor')
+  await nextTick()
+  void ws.createNote()
+}
+
+async function railCtxNewFolder() {
+  closeRailCtx()
+  libraryOpen.value = true
+  selectView('editor')
+  await nextTick()
+  void ws.createFolder?.(undefined, (ws as any).activeFolder || '')
 }
 
 function openLibraryPushed() {
@@ -340,9 +383,9 @@ onBeforeUnmount(() => {
     :data-view="ws.view"
     :data-library="libraryOpen ? 'open' : 'closed'"
   >
-    <nav class="work-rail" aria-label="墨记导航">
-      <div class="rail-signature" title="墨记" aria-label="墨记">
-        <span class="rail-mark" aria-hidden="true">记</span>
+    <nav class="work-rail" aria-label="诺麦笔记导航">
+      <div class="rail-signature" title="诺麦笔记" aria-label="诺麦笔记">
+        <span class="rail-mark" aria-hidden="true">诺</span>
       </div>
 
       <div class="rail-nav">
@@ -357,7 +400,8 @@ onBeforeUnmount(() => {
           :aria-label="v.title"
           :aria-keyshortcuts="viewShortcut(v.id)"
           @click="onRailActivate(v.id, $event)"
-          @dblclick.prevent="onRailActivate(v.id, $event)"
+          @dblclick.prevent="onRailDblClick(v.id, $event)"
+          @contextmenu.prevent="onRailContext(v.id, $event)"
         >
           <span class="rail-icon" aria-hidden="true">
             <!-- 清晰 SVG，避免 CSS 伪图标重叠错乱 -->
@@ -382,9 +426,14 @@ onBeforeUnmount(() => {
       </div>
     </nav>
 
-    <div class="library-drawer" :class="{ open: libraryOpen }" :aria-hidden="!libraryOpen && false">
+    <div
+      class="library-drawer"
+      :class="{ open: libraryOpen }"
+      :aria-hidden="libraryOpen ? 'false' : 'true'"
+    >
       <NoteSidebar />
     </div>
+    <!-- 宽屏为挤压布局，不需要遮罩；遮罩仅极窄覆盖模式使用（CSS 控制） -->
     <button
       v-if="libraryOpen"
       type="button"
@@ -436,5 +485,26 @@ onBeforeUnmount(() => {
     />
     <OnboardingTour />
     <ShortcutsPanel :open="shortcutsOpen" @close="shortcutsOpen = false" />
+
+    <!-- 右键「笔记」：新建笔记 / 文件夹 -->
+    <Teleport to="body">
+      <div
+        v-if="railCtx"
+        class="rail-ctx-layer"
+        @click="closeRailCtx"
+        @contextmenu.prevent="closeRailCtx"
+      >
+        <div
+          class="rail-ctx-menu"
+          role="menu"
+          :style="{ left: railCtx.x + 'px', top: railCtx.y + 'px' }"
+          @click.stop
+        >
+          <button type="button" role="menuitem" @click="railCtxNewNote">新建笔记</button>
+          <button type="button" role="menuitem" @click="railCtxNewFolder">新建文件夹</button>
+          <button type="button" role="menuitem" @click="libraryOpen = true; closeRailCtx()">打开笔记库</button>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

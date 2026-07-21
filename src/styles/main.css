@@ -2530,13 +2530,18 @@ input, textarea {
   position: relative;
   z-index: 20;
   isolation: isolate;
+  flex: 0 1 auto;
   margin-top: 10px;
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--surface);
   box-shadow: var(--shadow);
-  overflow: hidden;
+  /* 详情表单较长：允许在画布内滚动，避免裁切无法下滑 */
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: min(58vh, 520px);
+  overscroll-behavior: contain;
 }
 .cal-task-panel .task-inspector,
 .cal-task-panel .inspector-shell {
@@ -2724,9 +2729,11 @@ select:focus-visible,
 .app-shell {
   display: grid;
   grid-template-columns: 56px minmax(200px, var(--sidebar)) minmax(0, 1fr);
+  column-gap: 10px;
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  padding: 0 0 0 0;
   background:
     linear-gradient(90deg, color-mix(in srgb, var(--paper-deep) 48%, transparent), transparent 28%),
     var(--paper);
@@ -2734,9 +2741,27 @@ select:focus-visible,
 /* 收起笔记库：只留 rail + 主画布 */
 .app-shell[data-library='closed'] {
   grid-template-columns: 56px minmax(0, 1fr);
+  column-gap: 0;
 }
 .app-shell[data-library='closed'] .library-drawer {
-  display: none;
+  display: none !important;
+}
+/* 打开笔记库：三栏挤压，库与主区之间留缝 */
+.app-shell[data-library='open'] {
+  grid-template-columns: 56px minmax(200px, var(--sidebar)) minmax(0, 1fr);
+  column-gap: 10px;
+}
+.app-shell[data-library='open'] .library-drawer {
+  display: flex !important;
+  min-width: 0;
+  margin: 10px 0 10px 0;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.app-shell[data-library='open'] .main-pane {
+  margin-left: 0;
 }
 
 .work-rail {
@@ -5230,4 +5255,69 @@ html[data-density='compact'] .md-body .task-block-boundary {
 /* Softer diagnostics so first paint is not alarming */
 .task-block-status {
   border-bottom-color: color-mix(in srgb, var(--line) 80%, transparent) !important;
+}
+
+
+/* ===== v0.8.9: library gap + cal panel scroll + rail context menu ===== */
+.app-shell[data-library='open'] {
+  grid-template-columns: 56px minmax(200px, var(--sidebar)) minmax(0, 1fr) !important;
+  column-gap: 10px !important;
+}
+.app-shell[data-library='open'] .library-drawer {
+  display: flex !important;
+  visibility: visible !important;
+  min-width: 0;
+  height: calc(100% - 20px);
+  margin: 10px 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--paper-deep) 38%, var(--surface-2));
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.app-shell[data-library='open'] .main-pane {
+  margin-left: 0;
+}
+.app-shell[data-library='closed'] .library-drawer {
+  display: none !important;
+}
+.cal-task-panel {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  max-height: min(58vh, 520px) !important;
+}
+.rail-ctx-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: transparent;
+}
+.rail-ctx-menu {
+  position: fixed;
+  z-index: 81;
+  min-width: 148px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rail-ctx-menu button {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.rail-ctx-menu button:hover {
+  background: var(--surface-2);
+}
+.rail-nav-item.is-editor {
+  /* hint: 右键可新建 */
 }

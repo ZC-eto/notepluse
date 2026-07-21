@@ -43,7 +43,7 @@ const saveLabel = computed(() => {
     return { text: '保存失败', kind: 'danger', detail }
   }
   if (ws.dirty) return { text: '未保存', kind: 'warn' }
-  if (ws.status && !/同步|真源|工作台|墨记/.test(String(ws.status))) {
+  if (ws.status && !/同步|真源|工作台|诺麦笔记/.test(String(ws.status))) {
     return { text: String(ws.status), kind: 'muted' }
   }
   if (ws.activePath) return { text: '已保存', kind: 'ok' }

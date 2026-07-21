@@ -123,9 +123,9 @@ function openMain() {
       broadcast = true
     }
     if (broadcast) {
-      showFocusHint('已通知主窗口；若未出现，请从 ZTools 搜索再次打开「墨记」')
+      showFocusHint('已通知主窗口；若未出现，请从 ZTools 搜索再次打开「诺麦笔记」')
     } else {
-      showFocusHint('当前宿主无法直接唤起主窗，请从 ZTools 搜索打开「墨记」')
+      showFocusHint('当前宿主无法直接唤起主窗，请从 ZTools 搜索打开「诺麦笔记」')
     }
   } catch {
     showFocusHint('打开主窗失败，请从 ZTools 搜索打开插件')
@@ -179,7 +179,7 @@ onBeforeUnmount(() => {
       <div class="mini-sticky-drag">
         <span class="mini-sticky-mark" aria-hidden="true" />
         <button type="button" class="mini-sticky-titles is-btn" title="打开主窗口" @click="openMain">
-          <strong class="mini-sticky-title">墨记 · 今日</strong>
+          <strong class="mini-sticky-title">诺麦笔记 · 今日</strong>
           <span class="mini-sticky-sub">{{ openCount }}/{{ totalCount || 0 }} · {{ today.slice(5) }} · 点此打开主窗</span>
         </button>
       </div>

@@ -241,7 +241,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
                   @input="onOpacityInput"
                 />
               </div>
-              <p class="settings-foot">越低越通透。若点「打开主窗」无反应，请从 ZTools 搜索打开「墨记」。</p>
+              <p class="settings-foot">越低越通透。若点「打开主窗」无反应，请从 ZTools 搜索打开「诺麦笔记」。</p>
               <div class="settings-actions">
                 <button type="button" class="btn-ghost sm" @click="(ws as any).openMiniWindow?.()">打开小窗</button>
                 <button type="button" class="btn-ghost sm" @click="(ws as any).closeMiniWindow?.()">关闭小窗</button>
