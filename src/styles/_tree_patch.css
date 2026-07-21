@@ -1,0 +1,80 @@
+
+/* Unified tree rows */
+.tree-list { display: flex; flex-direction: column; gap: 0; padding: 2px 0; }
+.tree-row {
+  display: grid;
+  grid-template-columns: 16px 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 2px;
+  min-height: 28px;
+  height: 28px;
+  margin: 0 4px;
+  border-radius: 6px;
+  color: var(--ink);
+}
+.tree-row:hover { background: color-mix(in srgb, var(--surface-2) 80%, transparent); }
+.tree-row.active {
+  background: color-mix(in srgb, var(--surface-2) 100%, transparent);
+  box-shadow: inset 2px 0 0 var(--workline, var(--accent));
+}
+.tree-row.is-folder { font-weight: 500; }
+.tree-row.is-note { font-weight: 400; }
+.tree-chevron {
+  width: 16px; height: 28px; display: grid; place-items: center;
+  border: 0; background: transparent; color: var(--faint); font-size: 10px; padding: 0; cursor: pointer;
+}
+.tree-chevron.spacer { visibility: hidden; pointer-events: none; }
+.tree-chevron:hover { color: var(--ink); }
+.tree-icon-btn {
+  width: 22px; height: 22px; display: grid; place-items: center;
+  border: 0; border-radius: 5px; background: transparent; color: var(--muted); padding: 0; cursor: pointer;
+}
+.tree-icon-btn:hover { background: color-mix(in srgb, var(--surface) 70%, var(--line)); color: var(--ink); }
+.tree-icon-btn.static { cursor: default; pointer-events: none; opacity: 0.75; }
+.tree-row.active .tree-icon-btn { color: var(--accent-ink, var(--accent)); }
+.tree-label-btn {
+  display: flex; align-items: center; gap: 6px; min-width: 0; height: 28px;
+  padding: 0 6px 0 2px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit;
+}
+.tree-label {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12.5px; line-height: 1.2;
+}
+.tree-count {
+  flex: 0 0 auto; font-size: 10px; font-family: var(--mono); color: var(--faint); min-width: 1em; text-align: right;
+}
+.tree-glyph {
+  width: 14px; height: 14px; display: block; background: currentColor;
+  -webkit-mask: no-repeat center / contain; mask: no-repeat center / contain;
+}
+.tree-glyph[data-icon] {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><path fill=\'black\' d=\'M4 6h16v12H4z\'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><path fill=\'black\' d=\'M4 6h16v12H4z\'/></svg>");
+}
+.tree-glyph[data-icon=\'folder\'] {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><path fill=\'black\' d=\'M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z\'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><path fill=\'black\' d=\'M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z\'/></svg>");
+}
+.tree-glyph[data-icon=\'note\'] {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><path fill=\'black\' d=\'M7 3h8l4 4v14H7z\'/><path fill=\'white\' d=\'M15 3v4h4\'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><path fill=\'black\' d=\'M7 3h8l4 4v14H7z\'/><path fill=\'white\' d=\'M15 3v4h4\'/></svg>");
+}
+.icon-picker-pop {
+  position: fixed; z-index: 90;
+  display: grid; grid-template-columns: repeat(4, 32px); gap: 4px;
+  padding: 8px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface); box-shadow: 0 12px 32px rgba(0,0,0,.4);
+}
+.icon-picker-item {
+  width: 32px; height: 32px; display: grid; place-items: center;
+  border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer;
+}
+.icon-picker-item:hover { background: var(--surface-2); color: var(--ink); }
+.icon-picker-item.active { background: var(--accent-soft); color: var(--accent-ink, var(--accent)); }
+.folder-inline-create {
+  display: grid !important;
+  grid-template-columns: 22px minmax(0, 1fr) auto auto !important;
+  align-items: center !important; gap: 6px !important; padding: 4px 8px !important;
+}
+.folder-inline-create .icon-pick { display: none !important; }
+.tree-list .folder-empty { font-size: 11px; color: var(--faint); }

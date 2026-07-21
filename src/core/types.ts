@@ -138,6 +138,8 @@ export interface NoteGroup {
   label: string
   kind: FolderKind
   notes: NoteMeta[]
+  /** 侧栏展示用图标键（来自 config folderIcons） */
+  icon?: string
 }
 
 /** 同步后端选择：local 本地文件；webdiv 预留远程（未接通） */

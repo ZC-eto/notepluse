@@ -16,6 +16,9 @@ const newFolderIcon = ref('folder')
 const newFolderParent = ref('')
 const folderNameInput = ref<HTMLInputElement | null>(null)
 
+/** 点文件夹图标：弹出图标选择器 */
+const iconPicker = ref<{ folder: string; x: number; y: number } | null>(null)
+
 type SortField = 'name' | 'mtime'
 type SortDir = 'asc' | 'desc'
 const sortField = ref<SortField>('name')
@@ -36,7 +39,25 @@ type Group = {
   icon?: string
 }
 
-const ICON_KEYS = ['folder', 'user', 'briefcase', 'check', 'flag', 'pen'] as const
+/** Reading this as: Linear-style dense note tree — equal folder/note rows, pickable icons */
+const ICON_KEYS = [
+  'folder',
+  'inbox',
+  'user',
+  'briefcase',
+  'check',
+  'flag',
+  'pen',
+  'star',
+  'book',
+  'code',
+  'home',
+  'bolt',
+  'heart',
+  'tag',
+  'box',
+  'cloud',
+] as const
 
 const allGroups = computed(() => {
   return ((ws.noteGroups || []) as Group[]).map((g) => ({
@@ -98,29 +119,38 @@ function isQuickStart(name: string) {
   return titleOf(name) === '快速开始'
 }
 
-function fmtMtime(ms: number) {
-  if (!ms) return ''
-  const d = new Date(ms)
-  const now = new Date()
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  if (sameDay) {
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-  }
-  return `${d.getMonth() + 1}/${d.getDate()}`
-}
-
 function folderIconKey(group: { folder: string; kind: string; icon?: string }) {
-  if (group.icon && ICON_KEYS.includes(group.icon as any)) return group.icon
+  if (group.icon && (ICON_KEYS as readonly string[]).includes(group.icon)) return group.icon
   const top = (group.folder || '').split('/')[0] || ''
-  // 用户自建：默认 folder；kind 仅作弱提示
   if (group.kind === 'todo') return 'check'
   if (group.kind === 'record') return 'pen'
+  if (!group.folder) return 'inbox'
   if (/个人|user|me/i.test(top)) return 'user'
   if (/工作|work|job/i.test(top)) return 'briefcase'
   return 'folder'
+}
+
+function openIconPicker(ev: MouseEvent, folder: string) {
+  ev.preventDefault()
+  ev.stopPropagation()
+  closeCtx()
+  const rect = (ev.currentTarget as HTMLElement).getBoundingClientRect()
+  iconPicker.value = {
+    folder,
+    x: Math.min(rect.left, window.innerWidth - 220),
+    y: Math.min(rect.bottom + 4, window.innerHeight - 200),
+  }
+}
+
+function pickFolderIcon(icon: string) {
+  if (!iconPicker.value) return
+  const folder = iconPicker.value.folder
+  ;(ws as any).setFolderIcon?.(folder, icon)
+  iconPicker.value = null
+}
+
+function closeIconPicker() {
+  iconPicker.value = null
 }
 
 function startRename(path: string, name: string) {
@@ -184,9 +214,11 @@ async function confirmCreateFolder() {
     return
   }
   const parent = newFolderParent.value
+  const icon = newFolderIcon.value
   creatingFolder.value = false
   await ws.createFolder(name, parent)
-  // icon 暂存到 config（若 host 支持）；演示列表用 label 前缀弱表现
+  const rel = [parent, name].filter(Boolean).join('/')
+  ;(ws as any).setFolderIcon?.(rel, icon)
   newFolderName.value = ''
 }
 
@@ -225,7 +257,7 @@ function depthOf(folder: string) {
 }
 
 function displayFolderLabel(group: { folder: string; label: string }) {
-  if (!group.folder) return group.label
+  if (!group.folder) return group.label || '未分类'
   const parts = group.folder.split('/').filter(Boolean)
   return parts[parts.length - 1] || group.label
 }
@@ -236,7 +268,7 @@ function visibleNotes(notes: NoteMeta[]) {
 
 function openBlankCtx(ev: MouseEvent) {
   const t = ev.target as HTMLElement | null
-  if (t?.closest?.('.note-item, .folder-head, .sidebar-chrome, .sidebar-foot, .folder-inline-create, button, input')) {
+  if (t?.closest?.('.note-item, .tree-row, .sidebar-chrome, .sidebar-foot, .folder-inline-create, .icon-picker-pop, button, input')) {
     return
   }
   ev.preventDefault()
@@ -260,14 +292,21 @@ function closeCtx() {
 }
 
 function onGlobalPointer(ev: MouseEvent) {
-  if (!ctx.value) return
   const el = ev.target as HTMLElement | null
+  if (iconPicker.value && !el?.closest?.('.icon-picker-pop, .tree-icon-btn')) {
+    closeIconPicker()
+  }
+  if (!ctx.value) return
   if (el?.closest?.('.lib-ctx-menu')) return
   closeCtx()
 }
 
 function onGlobalKey(ev: KeyboardEvent) {
   if (ev.key === 'Escape') {
+    if (iconPicker.value) {
+      closeIconPicker()
+      return
+    }
     if (creatingFolder.value) {
       cancelCreateFolder()
       return
@@ -337,20 +376,15 @@ onBeforeUnmount(() => {
       />
     </div>
 
-    <!-- 行内新建文件夹：选图标 + 名称，无弹窗 -->
     <div v-if="creatingFolder" class="folder-inline-create">
-      <div class="icon-pick" role="listbox" aria-label="文件夹图标">
-        <button
-          v-for="key in ICON_KEYS"
-          :key="key"
-          type="button"
-          :class="{ active: newFolderIcon === key }"
-          :title="key"
-          @click="newFolderIcon = key"
-        >
-          <span class="folder-glyph" :data-icon="key" aria-hidden="true" />
-        </button>
-      </div>
+      <button
+        type="button"
+        class="tree-icon-btn"
+        :title="'图标：' + newFolderIcon"
+        @click="openIconPicker($event, '__new__')"
+      >
+        <span class="tree-glyph" :data-icon="newFolderIcon" aria-hidden="true" />
+      </button>
       <input
         ref="folderNameInput"
         v-model="newFolderName"
@@ -366,7 +400,7 @@ onBeforeUnmount(() => {
     <div v-if="!ws.notes.length && !filteredGroups.length && !creatingFolder" class="lib-empty-hero">
       <p>还没有文件夹</p>
       <button type="button" class="text-link strong" @click="beginCreateFolder('')">新建文件夹</button>
-      <span class="text-link" style="margin-left: 10px" @click="ws.createNote()">新建笔记</span>
+      <button type="button" class="text-link" style="margin-left: 10px" @click="ws.createNote()">新建笔记</button>
     </div>
 
     <div v-if="(ws as any).lastDeleted && (ws as any).lastDeleted.expires > Date.now()" class="undo-delete-bar" role="status">
@@ -374,71 +408,91 @@ onBeforeUnmount(() => {
       <button type="button" class="btn-ghost sm" @click="(ws as any).undoDeleteNote?.()">撤销</button>
     </div>
 
-    <div class="note-list">
+    <div class="note-list tree-list">
       <section
         v-for="(group, groupIndex) in filteredGroups"
         :key="group.folder || '__root__'"
         class="folder-group"
         :class="{ active: ws.activeFolder === group.folder }"
-        :style="{ '--folder-depth': Math.max(0, depthOf(group.folder)) }"
       >
         <div
-          class="folder-head"
-          :style="{ paddingLeft: `${Math.max(0, depthOf(group.folder)) * 10}px` }"
+          class="tree-row is-folder"
+          :class="{ active: ws.activeFolder === group.folder, collapsed: isCollapsed(group.folder) }"
+          :style="{ paddingLeft: `${6 + Math.max(0, depthOf(group.folder)) * 12}px` }"
           @contextmenu="openFolderCtx($event, group.folder, displayFolderLabel(group), group.kind)"
         >
           <button
             type="button"
-            class="folder-toggle"
+            class="tree-chevron"
             :aria-label="isCollapsed(group.folder) ? `展开 ${displayFolderLabel(group)}` : `折叠 ${displayFolderLabel(group)}`"
             :aria-expanded="!isCollapsed(group.folder)"
             :aria-controls="folderPanelId(group.folder, groupIndex)"
             @click="onToggleGroup(group.folder)"
           >
-            <span aria-hidden="true" />
+            <span aria-hidden="true">{{ isCollapsed(group.folder) ? '▸' : '▾' }}</span>
           </button>
           <button
             type="button"
-            class="folder-select"
-            :aria-pressed="ws.activeFolder === group.folder"
-            :title="group.folder || '根目录'"
-            @click="onSelectFolder(group.folder)"
+            class="tree-icon-btn"
+            :title="'更换图标'"
+            :aria-label="`更换 ${displayFolderLabel(group)} 的图标`"
+            @click="openIconPicker($event, group.folder)"
           >
-            <span class="folder-glyph" :data-icon="folderIconKey(group)" aria-hidden="true" />
-            <span class="folder-label">{{ displayFolderLabel(group) }}</span>
-            <span class="folder-count">{{ visibleNotes(group.notes).length }}</span>
+            <span class="tree-glyph" :data-icon="folderIconKey(group)" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            class="tree-label-btn"
+            :aria-pressed="ws.activeFolder === group.folder"
+            :title="group.folder || '未分类'"
+            @click="onSelectFolder(group.folder)"
+            @dblclick="onToggleGroup(group.folder)"
+          >
+            <span class="tree-label">{{ displayFolderLabel(group) }}</span>
+            <span class="tree-count">{{ visibleNotes(group.notes).length }}</span>
           </button>
         </div>
 
         <div :id="folderPanelId(group.folder, groupIndex)" v-show="!isCollapsed(group.folder)" class="folder-notes">
-          <article
+          <div
             v-for="note in visibleNotes(group.notes)"
             :key="note.path"
-            class="note-item"
+            class="tree-row is-note"
             :class="{ active: note.path === ws.activePath }"
+            :style="{ paddingLeft: `${6 + (Math.max(0, depthOf(group.folder)) + 1) * 12}px` }"
             @contextmenu="openNoteCtx($event, note.path, note.name)"
           >
-            <div v-if="renamingPath === note.path" class="note-open">
-              <span class="note-dot" aria-hidden="true" />
-              <span class="note-main">
-                <input
-                  v-model="renameDraft"
-                  class="rename-input"
-                  aria-label="笔记名称"
-                  @keydown.enter.prevent="commitRename"
-                  @keydown.esc.prevent="renamingPath = ''"
-                  @blur="commitRename"
-                />
-              </span>
+            <span class="tree-chevron spacer" aria-hidden="true" />
+            <span class="tree-icon-btn static" aria-hidden="true">
+              <span class="tree-glyph" data-icon="note" />
+            </span>
+            <div v-if="renamingPath === note.path" class="tree-label-btn">
+              <input
+                v-model="renameDraft"
+                class="rename-input"
+                aria-label="笔记名称"
+                @keydown.enter.prevent="commitRename"
+                @keydown.esc.prevent="renamingPath = ''"
+                @blur="commitRename"
+              />
             </div>
-            <button v-else type="button" class="note-open" :title="`打开 ${titleOf(note.name)}`" @click="ws.openNote(note.path)">
-              <span class="note-dot" aria-hidden="true" />
-              <span class="note-main">
-                <span class="note-name">{{ titleOf(note.name) }}</span>
-              </span>
+            <button
+              v-else
+              type="button"
+              class="tree-label-btn"
+              :title="`打开 ${titleOf(note.name)}`"
+              @click="ws.openNote(note.path)"
+            >
+              <span class="tree-label">{{ titleOf(note.name) }}</span>
             </button>
-          </article>
-          <div v-if="!visibleNotes(group.notes).length" class="folder-empty">空 · 右键新建笔记</div>
+          </div>
+          <div
+            v-if="!visibleNotes(group.notes).length"
+            class="folder-empty"
+            :style="{ paddingLeft: `${18 + (Math.max(0, depthOf(group.folder)) + 1) * 12}px` }"
+          >
+            空
+          </div>
         </div>
       </section>
 
@@ -451,6 +505,50 @@ onBeforeUnmount(() => {
       </button>
       <button type="button" class="foot-link" @click="onOpenFolder">打开文件夹</button>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="iconPicker && iconPicker.folder !== '__new__'"
+        class="icon-picker-pop"
+        role="listbox"
+        aria-label="选择文件夹图标"
+        :style="{ left: iconPicker.x + 'px', top: iconPicker.y + 'px' }"
+        @click.stop
+      >
+        <button
+          v-for="key in ICON_KEYS"
+          :key="key"
+          type="button"
+          class="icon-picker-item"
+          :class="{ active: folderIconKey({ folder: iconPicker.folder, kind: 'note', icon: (ws as any).getFolderIcon?.(iconPicker.folder) }) === key }"
+          :title="key"
+          @click="pickFolderIcon(key)"
+        >
+          <span class="tree-glyph" :data-icon="key" aria-hidden="true" />
+        </button>
+      </div>
+      <!-- 新建中：选图标写到 newFolderIcon -->
+      <div
+        v-else-if="iconPicker && iconPicker.folder === '__new__'"
+        class="icon-picker-pop"
+        role="listbox"
+        aria-label="选择文件夹图标"
+        :style="{ left: iconPicker.x + 'px', top: iconPicker.y + 'px' }"
+        @click.stop
+      >
+        <button
+          v-for="key in ICON_KEYS"
+          :key="'new-' + key"
+          type="button"
+          class="icon-picker-item"
+          :class="{ active: newFolderIcon === key }"
+          :title="key"
+          @click="newFolderIcon = key; closeIconPicker()"
+        >
+          <span class="tree-glyph" :data-icon="key" aria-hidden="true" />
+        </button>
+      </div>
+    </Teleport>
 
     <Teleport to="body">
       <div v-if="ctx" class="lib-ctx-layer" @contextmenu.prevent="closeCtx">
@@ -467,6 +565,7 @@ onBeforeUnmount(() => {
           <template v-else-if="ctx.kind === 'folder'">
             <button type="button" role="menuitem" @click="onCreateInFolder(ctx.folder)">在此新建笔记</button>
             <button type="button" role="menuitem" @click="beginCreateFolder(ctx.folder)">新建子文件夹</button>
+            <button type="button" role="menuitem" @click="iconPicker = { folder: ctx.folder, x: ctx.x, y: ctx.y }; closeCtx()">更换图标</button>
             <button type="button" role="menuitem" @click="onRenameFolder(ctx.folder)">重命名</button>
             <button type="button" role="menuitem" class="is-danger" @click="onDeleteFolder(ctx.folder)">删除</button>
           </template>
@@ -480,3 +579,4 @@ onBeforeUnmount(() => {
     </Teleport>
   </aside>
 </template>
+

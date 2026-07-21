@@ -79,6 +79,8 @@ let applyingHistory = false
 /** 最近删除的笔记（最小撤销） */
 const lastDeleted = ref<{ path: string; name: string; content: string; folder: string; kind: FolderKind; expires: number } | null>(null)
 const collapsedFolders = ref<Record<string, boolean>>({})
+/** 文件夹图标：path → icon key（存 config） */
+const folderIcons = ref<Record<string, string>>({})
 /** demo 模式下的内存内容，避免切笔记丢内容 */
 const demoStore = new Map<string, string>()
 
@@ -223,6 +225,9 @@ export function useWorkspace() {
       }
       if (isUiDensity(cfg.uiDensity)) uiDensity.value = cfg.uiDensity
       if (typeof cfg.onboardingCompleted === 'boolean') onboardingCompleted.value = cfg.onboardingCompleted
+      if (cfg.folderIcons && typeof cfg.folderIcons === 'object') {
+        folderIcons.value = { ...(cfg.folderIcons as Record<string, string>) }
+      }
       applyDensityToDom(uiDensity.value)
       if (!prefsApplied) {
         view.value = defaultView.value
@@ -248,6 +253,7 @@ export function useWorkspace() {
       miniWindowOpacity: miniWindowOpacity.value,
       uiDensity: uiDensity.value,
       onboardingCompleted: onboardingCompleted.value,
+      folderIcons: { ...folderIcons.value },
     }
     if (window.services?.writeConfig) {
       window.services.writeConfig(payload)
@@ -814,6 +820,7 @@ export function useWorkspace() {
         folder: f.path,
         label: f.path,
         kind: f.kind,
+        icon: folderIcons.value[f.path] || f.icon,
         notes: sortNotesByMtime(byFolder.get(f.path) || []),
       })
     }
@@ -824,6 +831,7 @@ export function useWorkspace() {
         folder: '',
         label: '未分类',
         kind: 'note',
+        icon: folderIcons.value[''] || 'inbox',
         notes: sortNotesByMtime(byFolder.get('') || []),
       })
       seen.add('')
@@ -836,6 +844,7 @@ export function useWorkspace() {
         folder: key,
         label: key || '未分类',
         kind: folderKindOf(key),
+        icon: folderIcons.value[key],
         notes: sortNotesByMtime(list),
       })
     }
@@ -1381,6 +1390,19 @@ export function useWorkspace() {
     return !!collapsedFolders.value[folder]
   }
 
+  function setFolderIcon(folderPath: string, icon: string) {
+    const key = folderPath || ''
+    const next = String(icon || 'folder').trim() || 'folder'
+    folderIcons.value = { ...folderIcons.value, [key]: next }
+    // also stamp FolderMeta if present
+    folders.value = folders.value.map((f) => (f.path === key ? { ...f, icon: next } : f))
+    persistUiPrefs()
+  }
+
+  function getFolderIcon(folderPath: string) {
+    return folderIcons.value[folderPath || ''] || ''
+  }
+
   async function renameNote(filePath: string, newTitle: string) {
     const safe = sanitizeTitle(newTitle)
     if (!safe) return
@@ -1716,6 +1738,9 @@ export function useWorkspace() {
     canUndo: computed(() => undoStack.value.length > 0),
     canRedo: computed(() => redoStack.value.length > 0),
     collapsedFolders,
+    folderIcons,
+    setFolderIcon,
+    getFolderIcon,
     activeTaskDocument,
     taskBlocks,
     taskDiagnostics,
