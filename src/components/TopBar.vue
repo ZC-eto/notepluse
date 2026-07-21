@@ -89,26 +89,35 @@ function onRetrySave() {
     </div>
 
     <div class="top-actions">
-      <div v-if="isEditorView" class="seg editor-mode-seg" role="group" aria-label="编辑模式">
+      <div v-if="isEditorView" class="mode-icon-seg" role="group" aria-label="编辑模式">
         <button
           type="button"
-          class="seg-btn"
+          class="mode-icon-btn"
           :class="{ active: ws.editorMode === 'wysiwyg' }"
           :aria-pressed="ws.editorMode === 'wysiwyg'"
-          title="排版 · Ctrl+Shift+M"
+          title="阅读排版 · Ctrl+Shift+M"
+          aria-label="阅读排版"
           @click="ws.setEditorMode('wysiwyg' as EditorMode)"
         >
-          排版
+          <!-- open book -->
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 5.5c2.2-1 4.5-1.2 6.5-.3V18c-2-.8-4.3-.6-6.5.3V5.5Zm16 0c-2.2-1-4.5-1.2-6.5-.3V18c2-.8 4.3-.6 6.5.3V5.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+          </svg>
         </button>
         <button
           type="button"
-          class="seg-btn"
+          class="mode-icon-btn"
           :class="{ active: ws.editorMode === 'source' }"
           :aria-pressed="ws.editorMode === 'source'"
           title="源码 · Ctrl+Shift+M"
+          aria-label="源码编辑"
           @click="ws.setEditorMode('source' as EditorMode)"
         >
-          源码
+          <!-- pen -->
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m5 16.5-.8 3.8 3.8-.8L18.7 9 15 5.3 5 16.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+            <path d="m13.2 7 3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
         </button>
       </div>
 
@@ -135,12 +144,13 @@ function onRetrySave() {
       <button
         v-if="showSaveAction && (ws.dirty || ws.saving)"
         type="button"
-        class="btn-solid btn-save"
+        class="icon-action btn-save-icon"
         :disabled="ws.saving || (!ws.dirty && !ws.saveError)"
         title="保存 · Ctrl+S"
+        aria-label="保存"
         @click="onRetrySave"
       >
-        保存
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h10l4 4v12H6z" fill="none" stroke="currentColor" stroke-width="1.6" /><path d="M8 4v5h8M9 20v-6h6v6" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
       </button>
       <button
         type="button"

@@ -6094,3 +6094,172 @@ html[data-density='compact'] .md-body .task-block-boundary {
 }
 .sidebar-top { display: none !important; } /* legacy header */
 .brand-row, .sidebar-top-actions, .sidebar-sort { display: none !important; }
+
+/* ========================================================================== */
+/* Chrome polish: icon mode switch, quiet pills, gantt compose, edge toggle    */
+/* ========================================================================== */
+
+/* Mode: book / pen icons instead of 排版|源码 text pills */
+.mode-icon-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 1px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-2);
+}
+.mode-icon-btn {
+  width: 28px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+}
+.mode-icon-btn svg { width: 15px; height: 15px; display: block; }
+.mode-icon-btn:hover { color: var(--ink); background: color-mix(in srgb, var(--surface) 70%, transparent); }
+.mode-icon-btn.active {
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: 0 1px 1px rgba(0,0,0,.05);
+}
+.seg.editor-mode-seg { display: none !important; }
+.btn-save { display: none !important; }
+.btn-save-icon {
+  color: var(--accent-ink, var(--accent));
+}
+
+/* Editor: task block is icon only */
+.editor-tool-btn.editor-tool-block {
+  min-width: 28px !important;
+  padding: 0 6px !important;
+  font-size: 0 !important;
+  font-weight: 500 !important;
+}
+.editor-tool-btn {
+  font-weight: 500 !important;
+}
+.editor-tool-btn.is-icon {
+  font-weight: 400 !important;
+}
+
+/* Library edge: always visible thin chevron on rail/main seam */
+.library-edge-toggle {
+  width: 16px !important;
+  min-width: 16px !important;
+  height: 56px !important;
+  opacity: 0.85;
+  border-radius: 0 10px 10px 0 !important;
+  background: color-mix(in srgb, var(--paper-deep) 40%, var(--surface)) !important;
+}
+.library-edge-toggle:hover {
+  opacity: 1;
+  background: var(--surface) !important;
+}
+.library-edge-arrow {
+  font-size: 16px !important;
+  font-weight: 500 !important;
+  color: var(--muted);
+}
+.app-shell[data-library='closed'] {
+  grid-template-columns: var(--rail) 16px minmax(0, 1fr) !important;
+}
+.app-shell[data-library='open'] {
+  grid-template-columns: var(--rail) minmax(200px, var(--sidebar)) 16px minmax(0, 1fr) !important;
+}
+
+/* Settings: lighter weight, no heavy bold */
+.settings-panel,
+.settings-panel * {
+  font-weight: 400;
+}
+.settings-panel .settings-card-title,
+.settings-panel h3,
+.settings-panel .settings-section-label {
+  font-weight: 550 !important;
+  letter-spacing: 0;
+}
+.settings-panel .settings-label {
+  font-weight: 500 !important;
+}
+.settings-panel .btn-solid,
+.settings-panel .btn-ghost,
+.settings-panel .seg-btn {
+  font-weight: 500 !important;
+}
+.settings-panel .settings-card {
+  border-radius: 8px;
+  box-shadow: none;
+}
+.settings-toggle span {
+  font-weight: 400 !important;
+}
+
+/* Gantt compose bar: compact single row */
+.gantt-compose-bar {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-height: 36px !important;
+  padding: 4px 8px !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 8px !important;
+  background: var(--surface-2) !important;
+  margin: 0 0 8px !important;
+}
+.gantt-compose-bar .composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 28px !important;
+  height: 28px !important;
+  padding: 0 8px !important;
+  font-size: 12px !important;
+  border-radius: 6px !important;
+}
+.gantt-compose-bar .date-input {
+  min-height: 28px !important;
+  height: 28px !important;
+  width: auto !important;
+  min-width: 118px;
+  max-width: 140px;
+  padding: 0 6px !important;
+  font-size: 12px !important;
+  border-radius: 6px !important;
+}
+.gantt-compose-bar select.date-input {
+  min-width: 140px;
+  max-width: 200px;
+}
+.gantt-compose-bar .btn-solid {
+  min-height: 28px !important;
+  height: 28px !important;
+  padding: 0 12px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 6px !important;
+}
+.gantt-compose-bar .date-sep {
+  color: var(--faint);
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+/* Soften heavy title weights app-wide in chrome */
+.doc-title {
+  font-weight: 500 !important;
+}
+.view-title-row h2,
+.gantt-title,
+.todo-title-heading {
+  font-weight: 550 !important;
+}
+.status-chip {
+  font-weight: 500 !important;
+  border-radius: 6px !important;
+}

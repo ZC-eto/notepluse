@@ -363,12 +363,28 @@ function onSourceKeydown(e: KeyboardEvent) {
 }
 
 /**
- * 排版模式换行策略（与 marked breaks:true 对齐）：
- * - Enter → 软换行 <br> → Markdown 单 \n
- * - Shift+Enter → 新段落
- * - 列表项内保留浏览器默认（新 li）
- * - 任务标题内吞掉 Enter，避免拆坏 task-item
+ * 排版模式：接近 Typora / 常见 Markdown 编辑器的换行与列表行为。
+ * - 普通段落：Enter = 新段落（不是 br），Shift+Enter = 软换行
+ * - 列表项内：Enter = 新 li；空 li 再 Enter = 退出列表
+ * - 行首输入 "- " / "* " / "1. " → 转成列表
+ * - 任务标题 / 任务块边界：吞掉 Enter，避免拆坏结构
  */
+function isInListItem(node: Node | null): HTMLLIElement | null {
+  let n: Node | null = node
+  while (n && n !== wysiwygEl.value) {
+    if (n instanceof HTMLLIElement) return n
+    n = n.parentNode
+  }
+  return null
+}
+
+function isEmptyListItem(li: HTMLLIElement): boolean {
+  const text = (li.textContent || '').replace(/​/g, '').trim()
+  if (text) return false
+  // only br / empty text nodes
+  return !li.querySelector('img, input, table, pre, code, ul, ol')
+}
+
 function handleWysiwygEnter(e: KeyboardEvent): boolean {
   if (e.key !== 'Enter' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return false
   const target = e.target as HTMLElement | null
@@ -376,21 +392,109 @@ function handleWysiwygEnter(e: KeyboardEvent): boolean {
     e.preventDefault()
     return true
   }
-  if (target?.closest?.('li')) return false
+
+  const sel = window.getSelection()
+  const anchor = sel?.anchorNode || null
+  const li = isInListItem(anchor)
+
+  if (li) {
+    // 空列表项：第二次 Enter → 退出列表
+    if (isEmptyListItem(li) && !e.shiftKey) {
+      e.preventDefault()
+      document.execCommand('outdent')
+      // 若仍在列表中，再出一层；然后拆成段落
+      const still = isInListItem(window.getSelection()?.anchorNode || null)
+      if (still && isEmptyListItem(still)) {
+        document.execCommand('insertParagraph')
+      }
+      commitWysiwyg()
+      return true
+    }
+    // 非空 li：交给浏览器默认新建列表项（不要 preventDefault 成 br）
+    // 默认会创建新 li；我们在 input 后 commit
+    window.setTimeout(() => commitWysiwyg(), 0)
+    return false
+  }
 
   e.preventDefault()
   if (e.shiftKey) {
-    document.execCommand('insertParagraph')
-  } else {
+    // 软换行
     document.execCommand('insertLineBreak')
+  } else {
+    // 新段落
+    document.execCommand('insertParagraph')
   }
   commitWysiwyg()
   return true
 }
 
+/** 行首 Markdown 速记：空格触发转列表 / 标题 */
+function handleWysiwygMarkdownShortcuts(e: KeyboardEvent): boolean {
+  if (e.key !== ' ' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return false
+  if (ws.editorMode !== 'wysiwyg' || !wysiwygEl.value) return false
+
+  const sel = window.getSelection()
+  if (!sel || !sel.isCollapsed || !sel.anchorNode) return false
+  // 已在列表里不再二次转换
+  if (isInListItem(sel.anchorNode)) return false
+
+  // 取当前块开头到光标的文本
+  let block: Node | null = sel.anchorNode
+  if (block.nodeType === Node.TEXT_NODE) block = block.parentNode
+  while (block && block !== wysiwygEl.value) {
+    if (
+      block instanceof HTMLElement &&
+      /^(P|DIV|H1|H2|H3|H4|H5|H6)$/i.test(block.tagName) &&
+      !block.classList.contains('task-item')
+    ) {
+      break
+    }
+    block = block.parentNode
+  }
+  if (!(block instanceof HTMLElement) || block === wysiwygEl.value) return false
+
+  const range = sel.getRangeAt(0)
+  const pre = document.createRange()
+  pre.selectNodeContents(block)
+  pre.setEnd(range.endContainer, range.endOffset)
+  const prefix = pre.toString()
+
+  // "- " / "* " → ul；"1. " / "1) " → ol；"# " → h1 等
+  if (/^[-*+]\s$/.test(prefix)) {
+    e.preventDefault()
+    // 删掉触发字符
+    document.execCommand('delete')
+    document.execCommand('delete')
+    document.execCommand('insertUnorderedList')
+    commitWysiwyg()
+    return true
+  }
+  if (/^\d+[.)]\s$/.test(prefix)) {
+    e.preventDefault()
+    // 删除 "N. "
+    const m = prefix.match(/^(\d+[.)]\s)$/)
+    if (m) {
+      for (let i = 0; i < m[1].length; i++) document.execCommand('delete')
+    }
+    document.execCommand('insertOrderedList')
+    commitWysiwyg()
+    return true
+  }
+  if (/^#{1,3}\s$/.test(prefix)) {
+    e.preventDefault()
+    const level = (prefix.match(/#/g) || []).length
+    for (let i = 0; i < prefix.length; i++) document.execCommand('delete')
+    document.execCommand('formatBlock', false, `h${level}`)
+    commitWysiwyg()
+    return true
+  }
+  return false
+}
+
 function onWysiwygKeydown(e: KeyboardEvent) {
   handleEditorKeydown(e)
   if (e.defaultPrevented) return
+  if (handleWysiwygMarkdownShortcuts(e)) return
   handleWysiwygEnter(e)
 }
 
@@ -502,12 +606,18 @@ onBeforeUnmount(() => {
         <span class="editor-tool-sep" aria-hidden="true" />
         <button
           type="button"
-          class="editor-tool-btn editor-tool-block"
-          title="插入任务组（可进待办/甘特/日历）Ctrl+Alt+T"
-          aria-label="插入任务组 Ctrl+Alt+T"
+          class="editor-tool-btn is-icon editor-tool-block"
+          title="插入任务组 Ctrl+Alt+T"
+          aria-label="插入任务组"
           @mousedown.prevent
           @click="insertTaskBlock"
-        >任务组</button>
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="4" width="16" height="16" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.5" />
+            <path d="m8 12 2.2 2.2 5-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M8 7h3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+        </button>
         <span class="editor-tool-sep" aria-hidden="true" />
         <button type="button" class="editor-tool-btn is-icon" title="撤销 Ctrl+Z" aria-label="撤销 Ctrl+Z" @mousedown.prevent @click="ws.editorMode === 'source' ? applySourceAction('undo') : applyWysiwygAction('undo')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8H4v4M4.5 12A7.5 7.5 0 1 0 7 6.4" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>

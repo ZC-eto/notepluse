@@ -216,38 +216,37 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             </div>
           </section>
 
-          <details class="settings-fold">
-            <summary class="settings-fold-summary">外观与桌面小窗</summary>
-            <section class="settings-card is-nested">
-              <h3 class="settings-card-title">
-                桌面小窗
-                <HelpTip text="磨砂置顶小窗：今日/收件箱勾选。点标题或任务可唤起主插件窗；小窗内不改标题/日期，保持轻量。" label="小窗说明" />
-              </h3>
-              <label class="settings-toggle">
-                <input type="checkbox" :checked="miniWindowEnabled" @change="toggleMini(($event.target as HTMLInputElement).checked)" />
-                <span>固定桌面小窗（磨砂列表）</span>
-              </label>
-              <div class="settings-slider-row">
-                <label class="settings-slider-label" for="mini-opacity">透明度 {{ miniOpacityPct }}%</label>
-                <input
-                  id="mini-opacity"
-                  class="settings-range"
-                  type="range"
-                  min="40"
-                  max="100"
-                  step="5"
-                  :value="miniOpacityPct"
-                  aria-label="小窗透明度"
-                  @input="onOpacityInput"
-                />
-              </div>
-              <p class="settings-foot">越低越通透。若点「打开主窗」无反应，请从 ZTools 搜索打开「诺麦笔记」。</p>
-              <div class="settings-actions">
-                <button type="button" class="btn-ghost sm" @click="(ws as any).openMiniWindow?.()">打开小窗</button>
-                <button type="button" class="btn-ghost sm" @click="(ws as any).closeMiniWindow?.()">关闭小窗</button>
-              </div>
-            </section>
-          </details>
+          <p class="settings-section-label">外观与桌面小窗</p>
+
+          <section class="settings-card">
+            <h3 class="settings-card-title">
+              桌面小窗
+              <HelpTip text="磨砂置顶小窗：今日/收件箱勾选。点标题或任务可唤起主插件窗；小窗内不改标题/日期，保持轻量。" label="小窗说明" />
+            </h3>
+            <label class="settings-toggle">
+              <input type="checkbox" :checked="miniWindowEnabled" @change="toggleMini(($event.target as HTMLInputElement).checked)" />
+              <span>固定桌面小窗（磨砂列表）</span>
+            </label>
+            <div class="settings-slider-row">
+              <label class="settings-slider-label" for="mini-opacity">透明度 {{ miniOpacityPct }}%</label>
+              <input
+                id="mini-opacity"
+                class="settings-range"
+                type="range"
+                min="40"
+                max="100"
+                step="5"
+                :value="miniOpacityPct"
+                aria-label="小窗透明度"
+                @input="onOpacityInput"
+              />
+            </div>
+            <p class="settings-foot">越低越通透。若点「打开主窗」无反应，请从 ZTools 搜索打开「诺麦笔记」。</p>
+            <div class="settings-actions">
+              <button type="button" class="btn-ghost sm" @click="(ws as any).openMiniWindow?.()">打开小窗</button>
+              <button type="button" class="btn-ghost sm" @click="(ws as any).closeMiniWindow?.()">关闭小窗</button>
+            </div>
+          </section>
 
           <!-- ===== 数据与高级 ===== -->
           <p class="settings-section-label">数据与高级</p>
