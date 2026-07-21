@@ -513,7 +513,7 @@ export function useWorkspace() {
             : `示例已齐全（${skipped} 篇）`
           : '示例笔记已存在'
       } else {
-        const bits = []
+        const bits: string[] = []
         if (created) bits.push(`新建 ${created}`)
         if (repaired) bits.push(`修复 ${repaired}`)
         if (skipped) bits.push(`跳过 ${skipped}`)
