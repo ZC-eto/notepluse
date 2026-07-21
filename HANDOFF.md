@@ -1,19 +1,25 @@
-# Handoff: 墨记 v0.8.7 UI 减噪
+# Handoff: 墨记（Garben）v0.8.8
 
 ## Session Metadata
 - Project: `D:\Code\ZTools_Plugin\md-workspace`
-- Version: **0.8.7** · plugin id `garben` · title **墨记**
-- Zip: `release/garben-v0.8.7.zip`
-- Branch: `master`
+- Version: **0.8.8** · plugin id `garben` · title **墨记**
+- Zip: `release/garben-v0.8.8.zip`
+- Branch: `master` @ `81488e2`
 
-## What landed (design-critique)
-1. **待办**：范围 + 未完成/已完成/全部 + 迷你进度；「筛选」「添加」折叠；今日摘要仅逾期相关；行详情改为「···」
-2. **顶栏**：投影视图隐藏排版/源码、编辑器帮助、保存（脏稿/失败时仍显示）
-3. **甘特**：有列表时折叠 compose；空态展开
-4. **日历**：「＋」默认隐藏，hover / 今日 / 焦点显示
-5. **视觉**：rail「笺」用 accent 色；逾期 workline 加强
-6. **设计系统**文档更名墨记
+## Brand
+| 项 | 值 |
+|----|-----|
+| 中文名 | **墨记** |
+| 技术 ID | `garben`（未改，配置/数据路径不变） |
+| 侧栏字标 | **记** |
+| 搜索词 | 墨记 / garben / md / 笔记 |
+| 小窗 | 墨记 · 今日 |
+
+## Recent
+- v0.8.7：UI 减噪（待办/日历/甘特/顶栏）
+- v0.8.8：展示名 稿笺 → 墨记（仅中文，id 仍为 garben）
 
 ## Next
-- 真机导入 0.8.7 冒烟
-- 可选：设置弹层遮罩时避免与视图叠字；统一 focus ring
+1. 真机导入 `release/garben-v0.8.8.zip`
+2. 确认宿主标题为「墨记」
+3. 若仍拗口可再换二字名（不改 garben id）
