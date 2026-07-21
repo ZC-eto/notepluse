@@ -1,8 +1,8 @@
-# Handoff: 稿笺 v0.8.7 UI 减噪
+# Handoff: 墨记 v0.8.7 UI 减噪
 
 ## Session Metadata
 - Project: `D:\Code\ZTools_Plugin\md-workspace`
-- Version: **0.8.7** · plugin id `garben` · title **稿笺**
+- Version: **0.8.7** · plugin id `garben` · title **墨记**
 - Zip: `release/garben-v0.8.7.zip`
 - Branch: `master`
 
@@ -12,7 +12,7 @@
 3. **甘特**：有列表时折叠 compose；空态展开
 4. **日历**：「＋」默认隐藏，hover / 今日 / 焦点显示
 5. **视觉**：rail「笺」用 accent 色；逾期 workline 加强
-6. **设计系统**文档更名稿笺
+6. **设计系统**文档更名墨记
 
 ## Next
 - 真机导入 0.8.7 冒烟

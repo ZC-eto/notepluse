@@ -169,7 +169,7 @@ function ensureSampleNote(root) {
 
 普通勾选不会进投影：
 
-- [ ] 这是一条普通清单，不会被稿笺收录
+- [ ] 这是一条普通清单，不会被墨记收录
 
 <!-- mdw:tasks id="release-plan" name="发布计划" color="violet" -->
 

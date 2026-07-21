@@ -21,7 +21,7 @@ const steps: Step[] = [
   {
     id: 'welcome',
     title: '从笔记开始',
-    body: '稿笺先是本地写作。内容存在你的笔记文件夹里，不是云端数据库。',
+    body: '墨记先是本地写作。内容存在你的笔记文件夹里，不是云端数据库。',
     target: '.work-rail .rail-nav-item.is-editor, .rail-nav .rail-nav-item.is-editor, nav.work-rail button.rail-nav-item:first-of-type, .work-rail button:nth-child(1)',
     view: 'editor',
     forceEditor: true,

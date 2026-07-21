@@ -1,4 +1,4 @@
-# 稿笺（Garben）
+# 墨记（Garben）
 
 ZTools 插件：本地 Markdown 笔记 + **显式任务语法**驱动的待办/甘特/日历投影。
 

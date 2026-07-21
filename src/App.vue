@@ -340,9 +340,9 @@ onBeforeUnmount(() => {
     :data-view="ws.view"
     :data-library="libraryOpen ? 'open' : 'closed'"
   >
-    <nav class="work-rail" aria-label="稿笺导航">
-      <div class="rail-signature" title="稿笺" aria-label="稿笺">
-        <span class="rail-mark" aria-hidden="true">笺</span>
+    <nav class="work-rail" aria-label="墨记导航">
+      <div class="rail-signature" title="墨记" aria-label="墨记">
+        <span class="rail-mark" aria-hidden="true">记</span>
       </div>
 
       <div class="rail-nav">

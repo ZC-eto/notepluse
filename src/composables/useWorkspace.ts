@@ -560,7 +560,7 @@ export function useWorkspace() {
           maximizable: false,
           minimizable: false,
           fullscreenable: false,
-          title: '稿笺 · 今日',
+          title: '墨记 · 今日',
           frame: false,
           transparent: true,
           hasShadow: false,
@@ -590,7 +590,7 @@ export function useWorkspace() {
       )
       miniWindowEnabled.value = true
       persistUiPrefs()
-      status.value = '已打开桌面稿笺'
+      status.value = '已打开桌面墨记'
     } catch (e) {
       console.warn('[garben] openMiniWindow failed', e)
       status.value = '打开小窗失败'
@@ -1726,7 +1726,7 @@ function demoContent(baseDate?: string) {
 
 这里可以写任意 Markdown。普通的 \`- [ ]\`、代码块和会议记录不会自动变成项目任务；只有显式 Task Block 中的条目会同步到待办、日历和甘特视图。
 
-- [ ] 这是一条普通清单，不会被稿笺收录
+- [ ] 这是一条普通清单，不会被墨记收录
 
 <!-- mdw:tasks id="release-plan" name="发布计划" color="violet" -->
 
