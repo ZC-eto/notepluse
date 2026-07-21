@@ -1,25 +1,23 @@
-# Handoff: 诺麦笔记 v0.8.9
+# Handoff: 诺麦笔记（NotePluse）v0.9.0
 
-## Brand
+## Brand / Identity
 | 项 | 值 |
 |----|-----|
-| 中文名 | **诺麦笔记** |
-| 英文别名 | NotePluse / notepluse |
-| 技术 ID | `garben`（配置路径不变） |
-| 侧栏字标 | **诺** |
-| Zip | `release/garben-v0.8.9.zip` |
+| 中文名 | 诺麦笔记 |
+| 技术 ID | **`notepluse`** |
+| 作者 | **zebra** |
+| 配置 | `notepluse-config.json`（自动从 garben / md-workspace 迁移） |
+| 默认笔记目录名 | `NotePluseNotes`（已有 `ZToolsNotes`/`GarbenNotes` 仍可在设置里指向） |
+| Zip | `release/notepluse-v0.9.0.zip` |
 
-## Fixes
-1. **日历详情可滚动**：`.cal-task-panel` overflow-y auto + max-height
-2. **笔记库缝隙**：打开时三栏 + column-gap 10px，库卡片圆角描边
-3. **单击/双击/右键笔记**：
-   - 单击：切到笔记视图（不自动开库）
-   - 双击：开笔记库
-   - 右键：菜单「新建笔记 / 新建文件夹 / 打开笔记库」
-4. 切到待办/甘特/日历时自动收起笔记库
+## Install (this machine)
+- 已写入：`%AppData%\Roaming\ZTools\plugins\notepluse\`
+- 已同步：`plugin-sync\notepluse.zip`
+- 已移除旧目录：`plugins\garben`、`plugin-sync\garben.zip`
+- 配置已从 `garben-config.json` 迁到 `notepluse-config.json`（notesRoot 等保留）
 
-## Note on 示例笔记
-笔记视图仍可能显示「快速开始 / 示例-待办甘特」等——来自磁盘/示例填充，不是 UI 假数据。可在笔记库删除，或设置里不要再点「填充示例」。
+## User action
+**完全退出并重启 ZTools**（仅关窗口可能缓存旧插件列表），搜索「诺麦笔记」或 `notepluse` / `md` 打开。
 
 ## Next
-真机导入 0.8.9 验证日历滚动、双击开库、右键菜单、标题「诺麦笔记」。
+真机验证：标题、作者、日历滚动、笔记库双击/右键、设置是否仍指向原笔记目录。
