@@ -1,18 +1,61 @@
-node_modules
-dist
-.DS_Store
-*.local
-.vscode
-.idea
+# Dependencies & build
+node_modules/
+dist/
+*.log
+npm-debug.log*
+yarn-error.log*
 
-# local / machine-specific / scratch
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Env & secrets (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.key
+*secret*
+*credentials*
+*credential*
+**/id_rsa*
+**/id_ed25519*
+.npmrc
+.yarnrc
+
+# Local / machine-specific / scratch
+*.local
 .local-backups/
 .playwright-mcp/
 .claude/
 work/
 work_repro.mts
+*.tmp
+*.temp
+_tmp*
+_remote_*
 
-# noisy screenshots (optional keep out of history)
+# Session / agent handoffs (conversation dumps)
+HANDOFF.md
+**/handoffs/
+**/*handoff*.md
+
+# Release artifacts (built zips; regenerate with npm run pack)
+release/
+*.zip
+
+# Noisy screenshots / probes
 gantt-inspector-desktop.png
 mdw-gantt-audit.png
-*.log
+*.png
+!public/logo.png
+
+# Optional local notes root configs (user machine paths)
+notepluse-config.json
+garben-config.json
+md-workspace-config.json
