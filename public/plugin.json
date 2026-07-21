@@ -4,7 +4,7 @@
   "title": "诺麦笔记",
   "description": "本地 Markdown 笔记与任务：文件夹 · 待办 · 甘特 · 日历",
   "author": "zebra",
-  "version": "0.9.10-quiet",
+  "version": "0.9.11-quiet",
   "main": "index.html",
   "preload": "preload/services.js",
   "logo": "logo.png",
