@@ -44,9 +44,10 @@ function onConfirm() {
       @click.self="emit('cancel')"
       @keydown.esc.prevent="emit('cancel')"
     >
-      <div class="confirm-panel prompt-panel">
-        <h3 class="confirm-title">{{ title || '请输入' }}</h3>
-        <p v-if="message" class="confirm-msg">{{ message }}</p>
+      <div class="confirm-panel prompt-panel quiet">
+        <h3 class="confirm-title quiet">{{ title || '请输入' }}</h3>
+        <!-- message 仅短提示；长说教由调用方避免传入 -->
+        <p v-if="message" class="confirm-msg quiet">{{ message }}</p>
         <input
           ref="inputEl"
           class="prompt-input"
@@ -56,9 +57,9 @@ function onConfirm() {
           @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
           @keydown.enter.prevent="onConfirm"
         />
-        <div class="confirm-actions">
-          <button type="button" class="btn-ghost" @click="emit('cancel')">{{ cancelText || '取消' }}</button>
-          <button type="button" class="btn-solid" @click="onConfirm">{{ confirmText || '确定' }}</button>
+        <div class="confirm-actions quiet">
+          <button type="button" class="text-link" @click="emit('cancel')">{{ cancelText || '取消' }}</button>
+          <button type="button" class="text-link strong" @click="onConfirm">{{ confirmText || '确定' }}</button>
         </div>
       </div>
     </div>

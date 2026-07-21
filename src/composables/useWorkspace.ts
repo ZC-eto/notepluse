@@ -1280,10 +1280,8 @@ export function useWorkspace() {
       name ||
       (await askPrompt({
         title: parent ? '新建子文件夹' : '新建文件夹',
-        message: parent
-          ? `在「${parent}」下新建。待办类请放在「今日待办 / 长期待办」下；笔记请放在「个人 / 工作 / 记录」下。`
-          : '建议：笔记 → 个人/工作/记录；待办 → 今日待办/长期待办。也可用 父/子 一次建多级。',
-        placeholder: parent ? '子文件夹名' : '例如：工作/项目A',
+        // 不说教：路径规则靠文件夹分区与图标，不在弹窗里讲课
+        placeholder: parent ? '名称' : '名称，或 工作/项目A',
         confirmText: '创建',
       }))
     if (!raw) return
@@ -1324,10 +1322,9 @@ export function useWorkspace() {
     const raw =
       newName ||
       (await askPrompt({
-        title: '重命名文件夹',
-        message: `将「${leaf}」重命名为：`,
+        title: '重命名',
         placeholder: leaf,
-        confirmText: '重命名',
+        confirmText: '确定',
         defaultValue: leaf,
       }))
     if (!raw) return

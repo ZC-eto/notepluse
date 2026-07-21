@@ -4,19 +4,17 @@ import type { useWorkspace } from '../composables/useWorkspace'
 import type { GlobalTask, Task, TaskBlockTarget, TaskPatch } from '../core/types'
 import { displayTaskTitle } from '../core/taskSyntax'
 import ScopeSeg from '../components/ScopeSeg.vue'
-import HelpTip from '../components/HelpTip.vue'
 import TaskInspector from '../components/TaskInspector.vue'
 import { globalTaskKey } from '../core/globalTasks'
 
 const ws = inject('workspace') as ReturnType<typeof useWorkspace>
 
-const calendarHelpText = '○ 单日、⌄ 截止、— 执行区间 与 ◆ 里程碑 分别显示；截止日不会被当作执行条。单日、截止、执行区间和里程碑分别呈现；截止不是执行结束日期。'
-const calendarEmptyHelpText = '此范围内没有可投影的日期任务。普通 Markdown checklist 不会进入日历。'
-const calendarDayEmptyHelpText = '这一天没有来自合法 Task Block 的日程。'
-const calendarWriteHelpText = '当前工作区没有合法 Task Block；请在源码模式创建合法任务组后再新建任务。'
 const cursor = ref(new Date())
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日']
 const scope = ref<'current' | 'all'>('current')
+/** month = 月网格；day = 单日议程 */
+const calMode = ref<'month' | 'day'>('month')
+const focusDay = ref<string | null>(null)
 
 const composeDay = ref<string | null>(null)
 const composeTitle = ref('')
@@ -30,11 +28,71 @@ function closeTaskPanel() {
 }
 
 function onEscapeLayer() {
-  if (selectedEventKey.value || composeDay.value) closeTaskPanel()
+  if (selectedEventKey.value || composeDay.value) {
+    closeTaskPanel()
+    return
+  }
+  if (calMode.value === 'day') {
+    calMode.value = 'month'
+    focusDay.value = null
+  }
 }
 
-onMounted(() => window.addEventListener('mdw:escape-layer', onEscapeLayer))
-onBeforeUnmount(() => window.removeEventListener('mdw:escape-layer', onEscapeLayer))
+function onCalKeydown(ev: KeyboardEvent) {
+  // 输入框内不劫持
+  const t = ev.target as HTMLElement | null
+  if (t && ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)) return
+  if (ev.ctrlKey || ev.metaKey || ev.altKey) return
+
+  if (calMode.value === 'month') {
+    if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp' || ev.key === 'PageUp') {
+      ev.preventDefault()
+      shiftMonth(-1)
+      return
+    }
+    if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown' || ev.key === 'PageDown') {
+      ev.preventDefault()
+      shiftMonth(1)
+      return
+    }
+    if (ev.key === 't' || ev.key === 'T') {
+      ev.preventDefault()
+      goToday()
+      return
+    }
+  } else if (calMode.value === 'day' && focusDay.value) {
+    if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') {
+      ev.preventDefault()
+      shiftFocusDay(-1)
+      return
+    }
+    if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') {
+      ev.preventDefault()
+      shiftFocusDay(1)
+      return
+    }
+    if (ev.key === 'Escape') {
+      ev.preventDefault()
+      calMode.value = 'month'
+      focusDay.value = null
+      return
+    }
+    if (ev.key === 't' || ev.key === 'T') {
+      ev.preventDefault()
+      focusDay.value = today
+      return
+    }
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('mdw:escape-layer', onEscapeLayer)
+  window.addEventListener('keydown', onCalKeydown)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('mdw:escape-layer', onEscapeLayer)
+  window.removeEventListener('keydown', onCalKeydown)
+})
 
 
 type TaskLike = Task | GlobalTask
@@ -82,6 +140,51 @@ function shiftMonth(n: number) {
 
 function goToday() {
   cursor.value = new Date()
+  if (calMode.value === 'day') focusDay.value = today
+}
+
+function shiftFocusDay(n: number) {
+  if (!focusDay.value) return
+  const [y, m, d] = focusDay.value.split('-').map(Number)
+  const next = new Date(y, m - 1, d + n)
+  focusDay.value = fmt(next)
+  cursor.value = new Date(next.getFullYear(), next.getMonth(), 1)
+}
+
+function openDayView(day: string) {
+  if (!day) return
+  focusDay.value = day
+  calMode.value = 'day'
+  const [y, m] = day.split('-').map(Number)
+  cursor.value = new Date(y, m - 1, 1)
+  selectedEventKey.value = null
+}
+
+function backToMonth() {
+  calMode.value = 'month'
+  focusDay.value = null
+}
+
+function onCellClick(cellKey: string, inMonth: boolean, ev: MouseEvent) {
+  if (!inMonth || !cellKey) return
+  // 点在任务或 + 上时不进日视图
+  const t = ev.target as HTMLElement | null
+  if (t?.closest?.('.cal-task, .cal-day-add, button')) return
+  openDayView(cellKey)
+}
+
+function selectEvent(event: CalendarEvent) {
+  // 单击：仅选中高亮，不强制开面板
+  selectedEventKey.value = event.key
+}
+
+function openEventDetail(event: CalendarEvent) {
+  selectedEventKey.value = event.key
+}
+
+function openGanttFromDay() {
+  // 跳转甘特查看排期（宿主视图切换）
+  ws.setView('gantt')
 }
 
 function taskKey(task: TaskLike): string {
@@ -201,7 +304,6 @@ const cells = computed(() => {
 })
 
 const today = fmt(new Date())
-const mobileDay = ref(today)
 
 function eventsForDay(day: string) {
   return calendarEvents.value.filter((event) => event.day === day)
@@ -239,10 +341,6 @@ async function submitAdd() {
     { notePath: target.notePath, blockId: target.blockId },
   )
   if (added) cancelAdd()
-}
-
-function selectEvent(event: CalendarEvent) {
-  selectedEventKey.value = selectedEventKey.value === event.key ? null : event.key
 }
 
 const selectedEvent = computed(() => calendarEvents.value.find((event) => event.key === selectedEventKey.value) || null)
@@ -309,98 +407,123 @@ function eventDateSummary(event: CalendarEvent) {
 </script>
 
 <template>
-  <div class="calendar-view">
+  <div class="calendar-view" :data-mode="calMode" tabindex="0">
     <header class="view-toolbar cal-toolbar" aria-label="日历工具栏">
       <div class="view-toolbar-primary">
-        <div class="cal-nav">
-          <button type="button" class="btn-ghost" aria-label="上个月" @click="shiftMonth(-1)">上月</button>
-          <div class="cal-title" aria-live="polite">{{ monthLabel(cursor) }}</div>
-          <button type="button" class="btn-ghost" aria-label="下个月" @click="shiftMonth(1)">下月</button>
-          <button type="button" class="btn-solid" @click="goToday">今天</button>
+        <div class="cal-nav quiet">
+          <template v-if="calMode === 'month'">
+            <button type="button" class="icon-nav" aria-label="上个月" title="上个月 · ←/↑" @click="shiftMonth(-1)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6 8.5 12l6 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            </button>
+            <div class="cal-title" aria-live="polite">{{ monthLabel(cursor) }}</div>
+            <button type="button" class="icon-nav" aria-label="下个月" title="下个月 · →/↓" @click="shiftMonth(1)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            </button>
+            <button type="button" class="text-link" title="今天 · T" @click="goToday">今天</button>
+          </template>
+          <template v-else>
+            <button type="button" class="text-link" @click="backToMonth">← 月视图</button>
+            <button type="button" class="icon-nav" aria-label="前一天" title="前一天 · ←" @click="shiftFocusDay(-1)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6 8.5 12l6 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            </button>
+            <div class="cal-title" aria-live="polite">{{ focusDay }}</div>
+            <button type="button" class="icon-nav" aria-label="后一天" title="后一天 · →" @click="shiftFocusDay(1)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            </button>
+            <button type="button" class="text-link" @click="openGanttFromDay">甘特</button>
+          </template>
         </div>
-        <div class="view-toolbar-cluster">
+        <div class="view-toolbar-cluster quiet">
           <ScopeSeg v-model="scope" :options="scopeOptions" aria-label="日历范围" />
-          <HelpTip :text="calendarHelpText" label="日历图例与语义说明" placement="left" />
         </div>
       </div>
     </header>
 
-    <div v-if="!calendarEvents.length" class="cal-banner">
-      <div class="cal-banner-text">
-        <span>暂无日期任务</span>
-        <HelpTip :text="calendarEmptyHelpText" label="空日历说明" />
-      </div>
-      <button type="button" class="btn-ghost sm" :disabled="!hasTargets" @click="openAdd(today)">为今天新建</button>
-    </div>
-
-    <section class="cal-mobile-agenda" aria-label="移动端日程">
-      <div class="cal-mobile-agenda-head">
-        <label>查看日期 <input v-model="mobileDay" class="date-input" type="date" /></label>
-        <button type="button" class="btn-ghost sm" :disabled="!hasTargets" @click="openAdd(mobileDay)">在这天新建</button>
-      </div>
-
-      <div v-if="eventsForDay(mobileDay).length" class="cal-mobile-event-list">
-        <button v-for="event in eventsForDay(mobileDay)" :key="event.key" type="button" class="cal-mobile-event" :class="[{ selected: selectedEventKey === event.key, done: event.task.done, 'is-readonly': !canWrite(event.task) }, `cal-task-${event.kind}`]" :style="eventStyle(event)" @click="selectEvent(event)">
-          <span class="cal-mobile-event-kind">{{ eventKindLabel(event.kind) }}</span>
-          <strong>{{ displayTitle(event.task) }}</strong>
-          <span>{{ eventDateSummary(event) }}</span>
-        </button>
-      </div>
-      <div v-else class="empty-state compact day-empty"><div class="empty-title-row"><div class="empty-desc">这天没有日程</div><HelpTip :text="calendarDayEmptyHelpText" label="空日程说明" /></div></div>
-    </section>
-
-    <div class="cal-board">
-      <div class="cal-weekdays" aria-hidden="true">
-        <div v-for="weekday in WEEKDAYS" :key="weekday" class="cal-weekday">{{ weekday }}</div>
-      </div>
-      <div class="cal-grid">
-        <div
-          v-for="cell in cells"
-          :key="cell.key"
-          class="cal-cell"
-          :class="{ empty: !cell.inMonth, today: cell.key === today, composing: composeDay === cell.key }"
-        >
-          <template v-if="cell.date">
-            <div class="cal-daynum">
-              <span class="cal-daynum-text">{{ cell.date.getDate() }}</span>
-              <button
-                type="button"
-                class="btn-ghost sm cal-day-add"
-                :disabled="!hasTargets"
-                :aria-label="`在 ${cell.key} 新建单日任务`"
-                title="新建单日任务"
-                @click="openAdd(cell.key)"
-              >＋</button>
-            </div>
-            <div class="cal-tasks">
-              <button
-                v-for="event in eventsForDay(cell.key).slice(0, 3)"
-                :key="event.key"
-                type="button"
-                class="cal-task"
-                :class="[
-                  { done: event.task.done, selected: selectedEventKey === event.key, 'is-readonly': !canWrite(event.task) },
-                  `cal-task-${event.kind}`,
-                  { 'cal-range-continuation': event.kind === 'range' && event.rangePosition === 'continuation' },
-                ]"
-                :style="eventStyle(event)"
-                :aria-label="gridEventAriaLabel(event)"
-                :title="gridEventAriaLabel(event)"
-                @click="selectEvent(event)"
-              ><span aria-hidden="true">{{ gridEventPrefix(event) }}</span> {{ gridEventLabel(event) }}</button>
-              <div v-if="eventsForDay(cell.key).length > 3" class="cal-more">+{{ eventsForDay(cell.key).length - 3 }}</div>
-            </div>
-          </template>
+    <!-- 月视图 -->
+    <template v-if="calMode === 'month'">
+      <div class="cal-board">
+        <div class="cal-weekdays" aria-hidden="true">
+          <div v-for="weekday in WEEKDAYS" :key="weekday" class="cal-weekday">{{ weekday }}</div>
+        </div>
+        <div class="cal-grid">
+          <div
+            v-for="cell in cells"
+            :key="cell.key"
+            class="cal-cell"
+            :class="{ empty: !cell.inMonth, today: cell.key === today, composing: composeDay === cell.key }"
+            @click="onCellClick(cell.key, cell.inMonth, $event)"
+          >
+            <template v-if="cell.date">
+              <div class="cal-daynum">
+                <span class="cal-daynum-text">{{ cell.date.getDate() }}</span>
+                <button
+                  type="button"
+                  class="cal-day-add quiet"
+                  :disabled="!hasTargets"
+                  :aria-label="`在 ${cell.key} 新建`"
+                  title="新建"
+                  @click.stop="openAdd(cell.key)"
+                >＋</button>
+              </div>
+              <div class="cal-tasks">
+                <button
+                  v-for="event in eventsForDay(cell.key).slice(0, 3)"
+                  :key="event.key"
+                  type="button"
+                  class="cal-task"
+                  :class="[
+                    { done: event.task.done, selected: selectedEventKey === event.key, 'is-readonly': !canWrite(event.task) },
+                    `cal-task-${event.kind}`,
+                    { 'cal-range-continuation': event.kind === 'range' && event.rangePosition === 'continuation' },
+                  ]"
+                  :style="eventStyle(event)"
+                  :aria-label="gridEventAriaLabel(event)"
+                  :title="gridEventAriaLabel(event) + ' · 双击详情'"
+                  @click.stop="selectEvent(event)"
+                  @dblclick.stop="openEventDetail(event)"
+                ><span aria-hidden="true">{{ gridEventPrefix(event) }}</span> {{ gridEventLabel(event) }}</button>
+                <button
+                  v-if="eventsForDay(cell.key).length > 3"
+                  type="button"
+                  class="cal-more"
+                  @click.stop="openDayView(cell.key)"
+                >+{{ eventsForDay(cell.key).length - 3 }}</button>
+              </div>
+            </template>
+          </div>
         </div>
       </div>
-    </div>
+    </template>
 
-    <div v-if="composeDay" class="cal-compose">
-      <div class="cal-compose-head">
-        <strong>在 {{ composeDay }} 新建单日任务</strong>
-        <button type="button" class="btn-ghost sm" @click="cancelAdd">关闭</button>
+    <!-- 日视图 -->
+    <template v-else>
+      <div class="cal-day-view" role="region" :aria-label="`${focusDay} 日程`">
+        <div v-if="focusDay && eventsForDay(focusDay).length" class="cal-day-list">
+          <button
+            v-for="event in eventsForDay(focusDay)"
+            :key="event.key"
+            type="button"
+            class="cal-day-row"
+            :class="{ selected: selectedEventKey === event.key, done: event.task.done }"
+            @click="selectEvent(event)"
+            @dblclick="openEventDetail(event)"
+          >
+            <span class="cal-day-kind">{{ eventPrefix(event.kind) }} {{ eventKindLabel(event.kind) }}</span>
+            <span class="cal-day-row-title">{{ displayTitle(event.task) }}</span>
+            <span class="cal-day-row-meta">{{ eventDateSummary(event) }}</span>
+          </button>
+        </div>
+        <div v-else class="cal-day-empty">这一天还没有日程</div>
+        <div class="cal-day-actions">
+          <button type="button" class="text-link" :disabled="!hasTargets || !focusDay" @click="focusDay && openAdd(focusDay)">新建</button>
+          <button type="button" class="text-link" @click="openGanttFromDay">在甘特中查看</button>
+        </div>
       </div>
+    </template>
+
+    <div v-if="composeDay" class="cal-compose quiet">
       <div class="cal-compose-row">
+        <span class="cal-compose-day">{{ composeDay }}</span>
         <input
           ref="composeInput"
           v-model="composeTitle"
@@ -411,27 +534,20 @@ function eventDateSummary(event: CalendarEvent) {
           @keyup.enter="submitAdd"
           @keyup.esc="cancelAdd"
         />
-        <select v-model="composeTargetKey" class="date-input" :disabled="!hasTargets" aria-label="新任务写入目标">
-          <option value="" disabled>选择笔记与任务组</option>
+        <select v-model="composeTargetKey" class="date-input" :disabled="!hasTargets" aria-label="写入目标">
+          <option value="" disabled>笔记 · 任务组</option>
           <option v-for="target in taskBlockTargets" :key="targetKey(target)" :value="targetKey(target)">
             {{ target.folder ? `${target.folder} / ` : '' }}{{ target.noteName }} · {{ target.blockName }}
           </option>
         </select>
-        <button type="button" class="btn-solid" :disabled="!composeTitle.trim() || !selectedTarget" @click="submitAdd">添加</button>
-      </div>
-      <div class="composer-inline-help">
-        <HelpTip
-          :text="hasTargets ? ('将写入所选任务组：- [ ] 标题 @date(' + composeDay + ')') : calendarWriteHelpText"
-          label="写入说明"
-        />
-        <span v-if="hasTargets">写入 @date({{ composeDay }})</span>
-        <span v-else>需先创建任务组</span>
+        <button type="button" class="text-link" @click="cancelAdd">取消</button>
+        <button type="button" class="text-link strong" :disabled="!composeTitle.trim() || !selectedTarget" @click="submitAdd">添加</button>
       </div>
     </div>
 
     <div v-if="selectedEvent" class="cal-task-panel">
       <div class="cal-task-panel-actions">
-        <button type="button" class="btn-ghost sm" @click="closeTaskPanel">关闭详情</button>
+        <button type="button" class="text-link" @click="closeTaskPanel">关闭</button>
       </div>
       <TaskInspector
         :task="selectedEvent.task"
