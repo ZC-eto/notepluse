@@ -217,15 +217,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           </section>
 
           <details class="settings-fold">
-            <summary class="settings-fold-summary">外观与桌面便签</summary>
+            <summary class="settings-fold-summary">外观与桌面小窗</summary>
             <section class="settings-card is-nested">
               <h3 class="settings-card-title">
-                桌面便签
-                <HelpTip text="磨砂置顶小窗：今日/收件箱勾选。点标题或任务可唤起主插件窗；小窗内不改标题/日期，保持轻量。" label="便签说明" />
+                桌面小窗
+                <HelpTip text="磨砂置顶小窗：今日/收件箱勾选。点标题或任务可唤起主插件窗；小窗内不改标题/日期，保持轻量。" label="小窗说明" />
               </h3>
               <label class="settings-toggle">
                 <input type="checkbox" :checked="miniWindowEnabled" @change="toggleMini(($event.target as HTMLInputElement).checked)" />
-                <span>固定桌面便签（磨砂列表）</span>
+                <span>固定桌面小窗（磨砂列表）</span>
               </label>
               <div class="settings-slider-row">
                 <label class="settings-slider-label" for="mini-opacity">透明度 {{ miniOpacityPct }}%</label>
@@ -237,14 +237,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
                   max="100"
                   step="5"
                   :value="miniOpacityPct"
-                  aria-label="便签透明度"
+                  aria-label="小窗透明度"
                   @input="onOpacityInput"
                 />
               </div>
-              <p class="settings-foot">越低越通透。若点「打开主窗」无反应，请从 ZTools 搜索打开本插件。</p>
+              <p class="settings-foot">越低越通透。若点「打开主窗」无反应，请从 ZTools 搜索打开「稿笺」。</p>
               <div class="settings-actions">
-                <button type="button" class="btn-ghost sm" @click="(ws as any).openMiniWindow?.()">打开便签</button>
-                <button type="button" class="btn-ghost sm" @click="(ws as any).closeMiniWindow?.()">关闭便签</button>
+                <button type="button" class="btn-ghost sm" @click="(ws as any).openMiniWindow?.()">打开小窗</button>
+                <button type="button" class="btn-ghost sm" @click="(ws as any).closeMiniWindow?.()">关闭小窗</button>
               </div>
             </section>
           </details>

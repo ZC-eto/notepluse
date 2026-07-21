@@ -1,6 +1,6 @@
-# Markdown 工作台（md-workspace）
+# 稿笺（Garben）
 
-ZTools 插件：本地 Markdown 笔记 + **显式任务语法**驱动的待办/甘特投影。
+ZTools 插件：本地 Markdown 笔记 + **显式任务语法**驱动的待办/甘特/日历投影。
 
 ## 分层模型
 
@@ -82,5 +82,6 @@ npm run build
 
 ## 默认存储
 
-笔记目录默认：`文档/ZToolsNotes`（可通过 preload 配置扩展）。
+笔记目录默认：`文档/GarbenNotes`（可通过设置更换；旧版 `ZToolsNotes` 若已存在可在设置里继续指向）。
+配置写在宿主 userData 的 `garben-config.json`（会尝试从旧版 `md-workspace-config.json` 迁移）。
 文件即数据，后续可对该目录做同步。

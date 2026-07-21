@@ -2,8 +2,10 @@ const fs = require('node:fs')
 const path = require('node:path')
 const os = require('node:os')
 
-const CONFIG_NAME = 'md-workspace-config.json'
-const DEFAULT_FOLDER_NAME = 'ZToolsNotes'
+const CONFIG_NAME = 'garben-config.json'
+/** 旧版插件名遗留配置，启动时若存在则合并迁移一次 */
+const LEGACY_CONFIG_NAMES = ['md-workspace-config.json']
+const DEFAULT_FOLDER_NAME = 'GarbenNotes'
 /** 默认一级文件夹（物理子目录） */
 const DEFAULT_FOLDERS = ['个人', '工作', '今日待办', '长期待办', '记录']
 /** 「记录」类：日记/流水，不强制任务模板 */
@@ -15,25 +17,61 @@ function safeGetPath(name) {
       return window.ztools.getPath(name)
     }
   } catch (e) {
-    console.warn('[md-workspace] getPath failed', name, e)
+    console.warn('[garben] getPath failed', name, e)
   }
   return null
 }
 
-function getConfigPath() {
-  const userData = safeGetPath('userData')
-  if (userData) return path.join(userData, CONFIG_NAME)
-  return path.join(os.homedir(), '.md-workspace-config.json')
+function getConfigDir() {
+  return safeGetPath('userData') || os.homedir()
 }
 
-function readConfig() {
-  const configPath = getConfigPath()
+function getConfigPath() {
+  const dir = getConfigDir()
+  if (safeGetPath('userData')) return path.join(dir, CONFIG_NAME)
+  return path.join(dir, '.garben-config.json')
+}
+
+function legacyConfigPaths() {
+  const dir = getConfigDir()
+  const inUserData = Boolean(safeGetPath('userData'))
+  const paths = []
+  for (const name of LEGACY_CONFIG_NAMES) {
+    paths.push(path.join(dir, name))
+    if (!inUserData) paths.push(path.join(dir, '.' + name))
+  }
+  if (inUserData) paths.push(path.join(os.homedir(), '.md-workspace-config.json'))
+  return paths
+}
+
+function readConfigFile(configPath) {
   try {
     if (fs.existsSync(configPath)) {
       return JSON.parse(fs.readFileSync(configPath, 'utf8'))
     }
   } catch (e) {
-    console.error('[md-workspace] readConfig failed', e)
+    console.error('[garben] readConfig failed', configPath, e)
+  }
+  return null
+}
+
+function readConfig() {
+  const configPath = getConfigPath()
+  const current = readConfigFile(configPath)
+  if (current && typeof current === 'object') return current
+
+  for (const legacy of legacyConfigPaths()) {
+    const data = readConfigFile(legacy)
+    if (data && typeof data === 'object') {
+      try {
+        fs.mkdirSync(path.dirname(configPath), { recursive: true })
+        fs.writeFileSync(configPath, JSON.stringify(data, null, 2), 'utf8')
+        console.info('[garben] migrated config from', legacy)
+      } catch (e) {
+        console.warn('[garben] config migrate write failed', e)
+      }
+      return data
+    }
   }
   return {}
 }
@@ -131,7 +169,7 @@ function ensureSampleNote(root) {
 
 普通勾选不会进投影：
 
-- [ ] 这是一条普通清单，不会被任务工作台收录
+- [ ] 这是一条普通清单，不会被稿笺收录
 
 <!-- mdw:tasks id="release-plan" name="发布计划" color="violet" -->
 
@@ -391,7 +429,7 @@ function openInFolder(filePath) {
       return true
     }
   } catch (e) {
-    console.warn('[md-workspace] openInFolder failed', e)
+    console.warn('[garben] openInFolder failed', e)
   }
   return false
 }
@@ -410,7 +448,7 @@ function chooseNotesRoot() {
       return null
     }
   } catch (e) {
-    console.warn('[md-workspace] chooseNotesRoot failed', e)
+    console.warn('[garben] chooseNotesRoot failed', e)
   }
   return null
 }

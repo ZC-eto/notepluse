@@ -1,10 +1,10 @@
 {
   "$schema": "../node_modules/@ztools-center/ztools-api-types/resource/ztools.schema.json",
-  "name": "md-workspace",
-  "title": "Markdown 工作台",
-  "description": "本地 Markdown 工作台：文件夹·全局待办·甘特/日历·设置与撤销",
+  "name": "garben",
+  "title": "稿笺",
+  "description": "本地 Markdown 笔记与任务：文件夹 · 待办 · 甘特 · 日历",
   "author": "ZTools Plugin",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "main": "index.html",
   "preload": "preload/services.js",
   "logo": "logo.png",
@@ -14,13 +14,14 @@
   "features": [
     {
       "code": "workspace",
-      "explain": "打开 Markdown 工作台",
+      "explain": "打开稿笺",
       "icon": "logo.png",
       "cmds": [
         "md",
         "笔记",
         "markdown",
-        "工作台"
+        "稿笺",
+        "garben"
       ]
     },
     {
@@ -52,7 +53,7 @@
     },
     {
       "code": "open-file",
-      "explain": "用工作台打开 Markdown 文件",
+      "explain": "用稿笺打开 Markdown 文件",
       "icon": "logo.png",
       "cmds": [
         {
@@ -63,7 +64,7 @@
             "md",
             "markdown"
           ],
-          "label": "用 Markdown 工作台打开"
+          "label": "用稿笺打开"
         }
       ]
     }

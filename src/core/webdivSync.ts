@@ -117,13 +117,13 @@ export const webdivSyncApi = {
     content: string
     mtime: number
   }): Promise<{ ok: false; reason: string }> {
-    // TODO(webdiv): 使用 ztools.db.put({ _id: `md-workspace/notes/${id}`, ... })
+    // TODO(webdiv): 使用 ztools.db.put({ _id: `garben/notes/${id}`, ... })
     // 并约定与本地文件的双向同步策略（冲突、删除、文件夹映射）
     return { ok: false, reason: 'webdiv push 未实现' }
   },
 
   async pullNotes(_since?: number): Promise<{ ok: false; reason: string; items: never[] }> {
-    // TODO(webdiv): ztools.db.allDocs('md-workspace/notes/') 拉取远端投影
+    // TODO(webdiv): ztools.db.allDocs('garben/notes/') 拉取远端投影
     return { ok: false, reason: 'webdiv pull 未实现', items: [] }
   },
 

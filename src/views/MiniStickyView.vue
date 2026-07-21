@@ -123,9 +123,9 @@ function openMain() {
       broadcast = true
     }
     if (broadcast) {
-      showFocusHint('已通知主窗口；若未出现，请从 ZTools 搜索再次打开「Markdown 工作台」')
+      showFocusHint('已通知主窗口；若未出现，请从 ZTools 搜索再次打开「稿笺」')
     } else {
-      showFocusHint('当前宿主无法直接唤起主窗，请从 ZTools 搜索打开「Markdown 工作台」')
+      showFocusHint('当前宿主无法直接唤起主窗，请从 ZTools 搜索打开「稿笺」')
     }
   } catch {
     showFocusHint('打开主窗失败，请从 ZTools 搜索打开插件')
@@ -179,7 +179,7 @@ onBeforeUnmount(() => {
       <div class="mini-sticky-drag">
         <span class="mini-sticky-mark" aria-hidden="true" />
         <button type="button" class="mini-sticky-titles is-btn" title="打开主窗口" @click="openMain">
-          <strong class="mini-sticky-title">今日便签</strong>
+          <strong class="mini-sticky-title">稿笺 · 今日</strong>
           <span class="mini-sticky-sub">{{ openCount }}/{{ totalCount || 0 }} · {{ today.slice(5) }} · 点此打开主窗</span>
         </button>
       </div>
@@ -190,7 +190,7 @@ onBeforeUnmount(() => {
             <path d="M10 4h10v10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
           </svg>
         </button>
-        <button type="button" class="mini-icon-btn danger" title="关闭便签" aria-label="关闭便签" @click="closeWindow">
+        <button type="button" class="mini-icon-btn danger" title="关闭小窗" aria-label="关闭小窗" @click="closeWindow">
           <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
             <path d="M7 7l10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
           </svg>

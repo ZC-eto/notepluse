@@ -1,7 +1,7 @@
 {
-  "name": "md-workspace",
-  "version": "0.8.5",
-  "description": "Markdown 工作台：本地笔记 + 显式待办语法驱动的待办/甘特投影",
+  "name": "garben",
+  "version": "0.8.6",
+  "description": "稿笺（Garben）：本地 Markdown 笔记 + 任务组驱动的待办/甘特/日历",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -70,7 +70,7 @@ function applyPluginHeight() {
     // 笔记工作台需要足够高度；宿主可再拖拽
     window.ztools?.setExpendHeight?.(760)
   } catch (e) {
-    console.warn('[md-workspace] setExpendHeight failed', e)
+    console.warn('[garben] setExpendHeight failed', e)
   }
 }
 
@@ -340,9 +340,9 @@ onBeforeUnmount(() => {
     :data-view="ws.view"
     :data-library="libraryOpen ? 'open' : 'closed'"
   >
-    <nav class="work-rail" aria-label="工作台导航">
-      <div class="rail-signature" title="墨线工作台" aria-label="墨线工作台">
-        <span class="rail-mark" aria-hidden="true">墨</span>
+    <nav class="work-rail" aria-label="稿笺导航">
+      <div class="rail-signature" title="稿笺" aria-label="稿笺">
+        <span class="rail-mark" aria-hidden="true">笺</span>
       </div>
 
       <div class="rail-nav">
