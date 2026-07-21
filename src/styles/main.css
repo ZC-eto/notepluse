@@ -6599,3 +6599,203 @@ body { background: var(--bg) !important; }
 .folder-inline-create .text-link {
   flex: 0 0 auto;
 }
+
+/* ========================================================================== */
+/* P1 anti-pattern cleanup: no pill walls, no 700+ bold                        */
+/* ========================================================================== */
+
+/* Scope tabs: underline / quiet text, not bordered pills */
+.scope-seg.quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.scope-seg.quiet .scope-tab {
+  position: relative;
+  min-height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.scope-seg.quiet .scope-tab:hover { color: var(--ink); }
+.scope-seg.quiet .scope-tab.active {
+  color: var(--ink);
+  font-weight: 550;
+  background: transparent;
+  box-shadow: none;
+}
+.scope-seg.quiet .scope-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 2px;
+  height: 1.5px;
+  background: var(--workline, var(--accent));
+  border-radius: 1px;
+}
+.scope-seg.quiet .scope-count {
+  margin-left: 4px;
+  font-size: 10px;
+  font-family: var(--mono);
+  font-style: normal;
+  font-weight: 500;
+  color: var(--faint);
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.scope-seg.quiet .scope-tab.active .scope-count { color: var(--muted); }
+
+/* Settings tabs same language */
+.settings-seg.quiet {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.settings-seg.quiet .seg-tab {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.settings-seg.quiet .seg-tab:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+}
+.settings-seg.quiet .seg-tab.active {
+  color: var(--ink);
+  font-weight: 550;
+  background: var(--surface-2);
+  box-shadow: none;
+}
+
+/* Status meta: plain text, not chips */
+.status-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--mono);
+}
+.status-meta.muted { color: var(--faint); }
+
+/* Kill legacy pill look when still present */
+.status-chip {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  font-weight: 500 !important;
+  color: var(--faint) !important;
+  font-size: 11px !important;
+}
+
+/* Global weight demotion for chrome (keep content readable) */
+.brand-name,
+.brand-mark,
+.rail-mark,
+.confirm-title,
+.settings-card-title,
+.settings-section-label,
+.settings-label,
+.onboard-title,
+.folder-label,
+.gantt-title,
+.view-title-row h2,
+.cal-title,
+.todo-toolbar .view-title,
+.scope-seg .seg-btn,
+.settings-seg .seg-btn,
+.seg-btn,
+.btn-solid,
+.btn-ghost {
+  font-weight: 550 !important;
+}
+
+/* Hard-cap heavy weights in CSS utilities that still declare 650-800 */
+.workspace-status-label,
+.sync-label,
+.folder-badge,
+.note-name,
+.inspector-title,
+.section-heading h3,
+.cal-daynum-text,
+.gantt-label-text,
+.todo-title {
+  font-weight: 500 !important;
+}
+
+/* Confirm quiet already uses text-link; ensure danger is color not box */
+.confirm-actions.quiet .text-link.danger,
+.text-link.danger {
+  color: var(--danger) !important;
+}
+.confirm-panel.quiet .confirm-title.quiet {
+  font-weight: 550 !important;
+  font-size: 14px !important;
+}
+.confirm-panel.quiet .confirm-msg.quiet {
+  font-weight: 400 !important;
+  color: var(--muted) !important;
+}
+
+/* Settings card titles lighter */
+.settings-panel .settings-card-title {
+  font-size: 12.5px !important;
+  font-weight: 550 !important;
+  color: var(--ink);
+}
+.settings-panel .settings-section-label {
+  font-size: 10.5px !important;
+  font-weight: 550 !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--faint) !important;
+}
+.settings-panel .btn-solid.sm,
+.settings-panel .btn-ghost.sm {
+  /* prefer text-link in updated markup; legacy fallback */
+  font-weight: 500 !important;
+  min-height: 28px;
+}
+
+/* View toolbar clusters: less boxy filter segs */
+.view-toolbar .filter-seg,
+.view-toolbar .scope-seg {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.view-toolbar .filter-seg .seg-btn {
+  border: 0 !important;
+  background: transparent !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+}
+.view-toolbar .filter-seg .seg-btn.active {
+  background: var(--surface-2) !important;
+  font-weight: 550 !important;
+}

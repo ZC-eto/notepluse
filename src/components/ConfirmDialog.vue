@@ -86,13 +86,19 @@ watch(
       @click.self="emit('cancel')"
       @keydown="onKeydown"
     >
-      <div ref="panelEl" class="confirm-panel" tabindex="-1">
-        <h3 id="confirm-dialog-title" class="confirm-title">{{ title || '???' }}</h3>
-        <p id="confirm-dialog-message" class="confirm-msg">{{ message }}</p>
-        <div class="confirm-actions">
-          <button ref="cancelEl" type="button" class="btn-ghost" @click="emit('cancel')">{{ cancelText || '??' }}</button>
-          <button ref="confirmEl" type="button" class="btn-solid" :class="{ danger: danger }" @click="emit('confirm')">
-            {{ confirmText || '??' }}
+      <div ref="panelEl" class="confirm-panel quiet" tabindex="-1">
+        <h3 id="confirm-dialog-title" class="confirm-title quiet">{{ title || '确认' }}</h3>
+        <p id="confirm-dialog-message" class="confirm-msg quiet">{{ message }}</p>
+        <div class="confirm-actions quiet">
+          <button ref="cancelEl" type="button" class="text-link" @click="emit('cancel')">{{ cancelText || '取消' }}</button>
+          <button
+            ref="confirmEl"
+            type="button"
+            class="text-link strong"
+            :class="{ danger: danger }"
+            @click="emit('confirm')"
+          >
+            {{ confirmText || '确定' }}
           </button>
         </div>
       </div>

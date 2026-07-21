@@ -136,23 +136,23 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               打开时默认
               <HelpTip text="下次启动优先显示的工作面。可与启用视图独立。" label="默认视图说明" />
             </h3>
-            <div class="settings-seg" role="group" aria-label="默认视图">
+            <div class="settings-seg quiet" role="group" aria-label="默认视图">
               <button
                 v-for="opt in viewOptions"
                 :key="opt.id"
                 type="button"
-                class="seg-btn"
+                class="seg-tab"
                 :class="{ active: defView === opt.id }"
                 @click="pickView(opt.id)"
               >
                 {{ opt.label }}
               </button>
             </div>
-            <div class="settings-seg settings-row-gap" role="group" aria-label="默认编辑模式">
-              <button type="button" class="seg-btn" :class="{ active: defMode === 'wysiwyg' }" @click="pickMode('wysiwyg')">
+            <div class="settings-seg quiet settings-row-gap" role="group" aria-label="默认编辑模式">
+              <button type="button" class="seg-tab" :class="{ active: defMode === 'wysiwyg' }" @click="pickMode('wysiwyg')">
                 排版
               </button>
-              <button type="button" class="seg-btn" :class="{ active: defMode === 'source' }" @click="pickMode('source')">
+              <button type="button" class="seg-tab" :class="{ active: defMode === 'source' }" @click="pickMode('source')">
                 源码
               </button>
             </div>
@@ -181,11 +181,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               显示密度
               <HelpTip text="紧凑适合 ZTools 窄窗；舒适适合大屏阅读。" label="显示密度说明" />
             </h3>
-            <div class="settings-seg" role="group" aria-label="显示密度">
-              <button type="button" class="seg-btn" :class="{ active: density === 'compact' }" @click="pickDensity('compact')">
+            <div class="settings-seg quiet" role="group" aria-label="显示密度">
+              <button type="button" class="seg-tab" :class="{ active: density === 'compact' }" @click="pickDensity('compact')">
                 紧凑
               </button>
-              <button type="button" class="seg-btn" :class="{ active: density === 'comfortable' }" @click="pickDensity('comfortable')">
+              <button type="button" class="seg-tab" :class="{ active: density === 'comfortable' }" @click="pickDensity('comfortable')">
                 舒适
               </button>
             </div>
@@ -197,8 +197,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               <HelpTip text="高亮真实界面控件的分步引导。可跳过，可重开。" label="引导说明" />
             </h3>
             <div class="settings-actions">
-              <button type="button" class="btn-solid sm" @click="restartTour">重新开始引导</button>
-              <button type="button" class="btn-ghost sm" @click="openShortcuts">快捷键一览</button>
+              <button type="button" class="text-link strong" @click="restartTour">重新开始引导</button>
+              <button type="button" class="text-link" @click="openShortcuts">快捷键一览</button>
             </div>
             <div class="settings-help-topics">
               <details class="settings-help">

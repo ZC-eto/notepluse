@@ -640,11 +640,10 @@ onBeforeUnmount(() => {
           <HelpTip :text="ganttHelpText" label="甘特视图说明" />
           <span
             v-if="excludedCount"
-            class="status-chip"
+            class="status-meta"
             :title="excludedHelpText"
           >
             未投影 {{ excludedCount }}
-            <HelpTip :text="excludedHelpText" label="未进入甘特的任务说明" />
           </span>
         </div>
         <div class="view-toolbar-cluster">
@@ -833,7 +832,7 @@ onBeforeUnmount(() => {
               <input class="date-input" type="date" :disabled="!canWrite(selectedEntry.task)" :value="selectedEntry.task.date" aria-label="里程碑日期" @change="onMilestoneDateChange(selectedEntry.task, $event)" />
             </label>
           </template>
-          <span v-if="!canWrite(selectedEntry.task)" class="status-chip muted">只读</span>
+          <span v-if="!canWrite(selectedEntry.task)" class="status-meta muted">只读</span>
         </div>
 
         <div class="gantt-task-panel-actions">

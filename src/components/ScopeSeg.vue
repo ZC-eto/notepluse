@@ -8,12 +8,12 @@ const emit = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 </script>
 
 <template>
-  <div class="scope-seg" role="tablist" :aria-label="ariaLabel || '范围'">
+  <div class="scope-seg quiet" role="tablist" :aria-label="ariaLabel || '范围'">
     <button
       v-for="opt in options"
       :key="opt.id"
       type="button"
-      class="seg-btn"
+      class="scope-tab"
       role="tab"
       :class="{ active: modelValue === opt.id }"
       :aria-selected="modelValue === opt.id"
