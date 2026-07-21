@@ -1281,9 +1281,9 @@ export function useWorkspace() {
       (await askPrompt({
         title: parent ? '新建子文件夹' : '新建文件夹',
         message: parent
-          ? `在「${parent}」下新建子文件夹。也可用 父/子 路径一次建多级。`
-          : '支持多级路径，例如：工作/项目A',
-        placeholder: parent ? '子文件夹名' : '例如：个人 · 工作/项目A',
+          ? `在「${parent}」下新建。待办类请放在「今日待办 / 长期待办」下；笔记请放在「个人 / 工作 / 记录」下。`
+          : '建议：笔记 → 个人/工作/记录；待办 → 今日待办/长期待办。也可用 父/子 一次建多级。',
+        placeholder: parent ? '子文件夹名' : '例如：工作/项目A',
         confirmText: '创建',
       }))
     if (!raw) return
@@ -1312,6 +1312,110 @@ export function useWorkspace() {
       await refreshNotes()
     } catch (e) {
       status.value = '新建文件夹失败'
+      console.error(e)
+    }
+  }
+
+  async function renameFolder(folderPath: string, newName?: string) {
+    const rel = String(folderPath || '').replace(/\\/g, '/').trim()
+    if (!rel) return
+    const current = folders.value.find((f) => f.path === rel)
+    const leaf = current?.name || rel.split('/').pop() || rel
+    const raw =
+      newName ||
+      (await askPrompt({
+        title: '重命名文件夹',
+        message: `将「${leaf}」重命名为：`,
+        placeholder: leaf,
+        confirmText: '重命名',
+        defaultValue: leaf,
+      }))
+    if (!raw) return
+    const next = String(raw).trim()
+    if (!next || next === leaf) return
+
+    if (!window.services?.renameFolder) {
+      // demo / no host API：仅改本地列表
+      folders.value = ensureFolderList(
+        folders.value.map((f) => {
+          if (f.path === rel) {
+            const parent = rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : ''
+            const path = [parent, next].filter(Boolean).join('/')
+            return { ...f, name: next, path, kind: folderKindOf(path) }
+          }
+          if (f.path.startsWith(rel + '/')) {
+            const path = next + f.path.slice(rel.length)
+            return { ...f, path, kind: folderKindOf(path) }
+          }
+          return f
+        })
+      )
+      notes.value = notes.value.map((n) => {
+        const folder = n.folder || ''
+        if (folder === rel) return { ...n, folder: [rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '', next].filter(Boolean).join('/') }
+        if (folder.startsWith(rel + '/')) return { ...n, folder: next + folder.slice(rel.length) }
+        return n
+      })
+      if (activeFolder.value === rel || activeFolder.value.startsWith(rel + '/')) {
+        activeFolder.value =
+          activeFolder.value === rel
+            ? [rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '', next].filter(Boolean).join('/')
+            : next + activeFolder.value.slice(rel.length)
+      }
+      status.value = '已重命名文件夹（演示）'
+      return
+    }
+
+    try {
+      const result = window.services.renameFolder(rel, next)
+      if (activeFolder.value === rel || activeFolder.value.startsWith(rel + '/')) {
+        activeFolder.value =
+          activeFolder.value === rel
+            ? result.path
+            : result.path + activeFolder.value.slice(rel.length)
+      }
+      status.value = '已重命名文件夹'
+      await refreshNotes()
+    } catch (e: any) {
+      status.value = e?.message || '重命名文件夹失败'
+      console.error(e)
+    }
+  }
+
+  async function removeFolder(folderPath: string) {
+    const rel = String(folderPath || '').replace(/\\/g, '/').trim()
+    if (!rel) return
+    if (DEFAULT_FOLDERS.includes(rel)) {
+      status.value = '默认文件夹不可删除'
+      return
+    }
+    const hasNotes = notes.value.some((n) => (n.folder || '') === rel || (n.folder || '').startsWith(rel + '/'))
+    if (hasNotes) {
+      status.value = '文件夹非空，请先移走或删除其中的笔记'
+      return
+    }
+    const ok = await askConfirm({
+      title: '删除文件夹',
+      message: `确定删除空文件夹「${rel}」？`,
+      confirmText: '删除',
+      danger: true,
+    })
+    if (!ok) return
+
+    if (!window.services?.deleteFolder) {
+      folders.value = ensureFolderList(folders.value.filter((f) => f.path !== rel && !f.path.startsWith(rel + '/')))
+      if (activeFolder.value === rel || activeFolder.value.startsWith(rel + '/')) activeFolder.value = ''
+      status.value = '已删除文件夹（演示）'
+      return
+    }
+
+    try {
+      window.services.deleteFolder(rel)
+      if (activeFolder.value === rel || activeFolder.value.startsWith(rel + '/')) activeFolder.value = ''
+      status.value = '已删除文件夹'
+      await refreshNotes()
+    } catch (e: any) {
+      status.value = e?.message || '删除文件夹失败'
       console.error(e)
     }
   }
@@ -1687,6 +1791,8 @@ export function useWorkspace() {
     createTodayPlan,
     openSampleNote,
     createFolder,
+    renameFolder,
+    removeFolder,
     setActiveFolder,
     toggleFolderCollapse,
     isFolderCollapsed,

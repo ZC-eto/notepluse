@@ -30,7 +30,9 @@ interface FolderInfo {
 interface Services {
   listNotes: () => { root: string; files: NoteFile[]; folders?: FolderInfo[] }
   listFolders?: () => { root: string; folders: FolderInfo[]; defaults: string[] }
-  createFolder?: (name: string) => FolderInfo
+  createFolder?: (name: string, parentFolder?: string) => FolderInfo
+  renameFolder?: (relPath: string, newName: string) => FolderInfo
+  deleteFolder?: (relPath: string) => boolean
   readNote: (filePath: string) => string
   writeNote: (filePath: string, content: string) => boolean
   createNote: (title: string, folder?: string, body?: string) => { path: string; name: string; content: string; folder?: string; kind?: FolderKind }

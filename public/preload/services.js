@@ -285,6 +285,46 @@ function createFolder(name, parentFolder) {
   }
 }
 
+function renameFolder(relPath, newName) {
+  const root = getNotesRoot()
+  const rel = normalizeRelFolder(relPath)
+  if (!rel) throw new Error('文件夹路径为空')
+  const leaf = sanitizeFolderName(newName)
+  if (!leaf) throw new Error('文件夹名称为空')
+  const from = resolveUnderRoot(root, rel)
+  if (!fs.existsSync(from) || !fs.statSync(from).isDirectory()) {
+    throw new Error('文件夹不存在: ' + rel)
+  }
+  const parentRel = rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : ''
+  const nextRel = normalizeRelFolder([parentRel, leaf].filter(Boolean).join('/'))
+  if (nextRel === rel) {
+    return { name: leaf, path: rel, fullPath: from, kind: folderKind(rel) }
+  }
+  const to = resolveUnderRoot(root, nextRel)
+  if (fs.existsSync(to)) throw new Error('目标文件夹已存在: ' + nextRel)
+  fs.renameSync(from, to)
+  return { name: leaf, path: nextRel, fullPath: to, kind: folderKind(nextRel) }
+}
+
+function deleteFolder(relPath) {
+  const root = getNotesRoot()
+  const rel = normalizeRelFolder(relPath)
+  if (!rel) throw new Error('文件夹路径为空')
+  // 默认一级目录不允许删，避免用户误清结构
+  if (DEFAULT_FOLDERS.includes(rel)) {
+    throw new Error('默认文件夹不可删除: ' + rel)
+  }
+  const full = resolveUnderRoot(root, rel)
+  if (!fs.existsSync(full) || !fs.statSync(full).isDirectory()) {
+    throw new Error('文件夹不存在: ' + rel)
+  }
+  // 仅允许空目录，避免误删笔记
+  const entries = fs.readdirSync(full)
+  if (entries.length) throw new Error('文件夹非空，请先移走或删除其中的笔记')
+  fs.rmdirSync(full)
+  return true
+}
+
 function walkNotes(dir, relFolder, out) {
   let entries
   try {
@@ -460,6 +500,8 @@ window.services = {
   listNotes,
   listFolders,
   createFolder,
+  renameFolder,
+  deleteFolder,
   readNote,
   writeNote,
   createNote,

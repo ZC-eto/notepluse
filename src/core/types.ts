@@ -129,6 +129,8 @@ export interface FolderMeta {
   path: string
   fullPath?: string
   kind: FolderKind
+  /** 可选：文件夹图标键（UI 选择，写入 config） */
+  icon?: string
 }
 
 export interface NoteGroup {
