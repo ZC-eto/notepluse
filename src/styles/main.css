@@ -6799,3 +6799,213 @@ body { background: var(--bg) !important; }
   background: var(--surface-2) !important;
   font-weight: 550 !important;
 }
+
+/* ========================================================================== */
+/* Editor toolbar: no undo/redo; overflow only on narrow                       */
+/* Settings sheet: match shell language (no help walls / heavy cards)          */
+/* ========================================================================== */
+
+.editor-toolbar {
+  flex-wrap: nowrap !important;
+  gap: 2px !important;
+  min-height: 32px !important;
+  padding: 2px 6px !important;
+}
+.editor-tool-btn.is-icon {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+}
+/* 默认：宽屏显示全部；⋯ 隐藏 */
+.editor-tool-narrow-only { display: none !important; }
+.editor-tool-wide-only { display: grid !important; }
+
+@media (max-width: 900px) {
+  .editor-tool-wide-only { display: none !important; }
+  .editor-tool-narrow-only { display: block !important; }
+}
+
+/* Settings: flat list like shell, no boxed essay cards */
+.settings-overlay {
+  display: grid !important;
+  place-items: center !important;
+  background: rgba(0, 0, 0, 0.55) !important;
+  backdrop-filter: blur(6px);
+}
+.settings-sheet {
+  width: min(380px, 94vw);
+  max-height: min(86vh, 720px);
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.settings-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+.settings-sheet-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 550;
+  letter-spacing: 0;
+}
+.settings-sheet-body {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 8px 0 16px;
+}
+.set-block {
+  padding: 10px 14px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+.set-block:last-child { border-bottom: 0; }
+.set-label {
+  margin: 0 0 8px;
+  font-size: 10.5px;
+  font-weight: 550;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.set-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+.set-tab {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.set-tab:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+.set-tab.active {
+  color: var(--ink);
+  background: var(--surface-2);
+  font-weight: 550;
+}
+.set-gap { margin-top: 6px; }
+.set-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--ink);
+  cursor: pointer;
+}
+.set-check input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+}
+.set-checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 12px;
+}
+.set-checks .set-check { margin-top: 4px; }
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.set-muted {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--faint);
+  font-weight: 400;
+}
+.set-range {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+.set-path {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 6px;
+}
+.set-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+}
+.set-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 8px 0;
+  font-size: 12.5px;
+  font-weight: 400;
+  cursor: pointer;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+.set-choice:last-of-type { border-bottom: 0; }
+.set-choice:hover { color: var(--accent-ink, var(--ink)); }
+.set-choice.active { color: var(--ink); }
+.set-choice em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--faint);
+  font-weight: 500;
+}
+.set-choice.active em { color: var(--accent-ink, var(--accent)); }
+
+/* Hide legacy heavy settings pieces if still referenced */
+.settings-panel-v083 .settings-sub,
+.settings-help-topics,
+.settings-foot,
+.settings-card-title .help-tip,
+.settings-advanced {
+  /* legacy structure may still paint once; sheet is primary */
+}
+
+/* Folder inline create: match chrome density */
+.folder-inline-create {
+  background: transparent !important;
+  border-bottom: 1px solid var(--line) !important;
+}
+.folder-inline-create input {
+  font-weight: 400 !important;
+}
+
+/* Sidebar empty hero links */
+.lib-empty-hero .text-link {
+  cursor: pointer;
+}
