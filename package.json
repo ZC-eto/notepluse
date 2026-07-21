@@ -1,6 +1,6 @@
 {
-  "name": "garben",
-  "version": "0.8.9",
+  "name": "notepluse",
+  "version": "0.9.0",
   "description": "诺麦笔记（NotePluse）：本地 Markdown 笔记 + 任务组驱动的待办/甘特/日历",
   "type": "module",
   "scripts": {

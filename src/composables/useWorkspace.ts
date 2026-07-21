@@ -592,7 +592,7 @@ export function useWorkspace() {
       persistUiPrefs()
       status.value = '已打开桌面诺麦笔记'
     } catch (e) {
-      console.warn('[garben] openMiniWindow failed', e)
+      console.warn('[notepluse] openMiniWindow failed', e)
       status.value = '打开小窗失败'
     }
   }
@@ -1144,7 +1144,7 @@ export function useWorkspace() {
         try {
           await refreshNotes()
         } catch (e) {
-          console.warn('[garben] refresh after save failed', e)
+          console.warn('[notepluse] refresh after save failed', e)
         }
         return true
       } catch (e) {

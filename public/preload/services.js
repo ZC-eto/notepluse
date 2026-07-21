@@ -2,10 +2,10 @@ const fs = require('node:fs')
 const path = require('node:path')
 const os = require('node:os')
 
-const CONFIG_NAME = 'garben-config.json'
+const CONFIG_NAME = 'notepluse-config.json'
 /** 旧版插件名遗留配置，启动时若存在则合并迁移一次 */
-const LEGACY_CONFIG_NAMES = ['md-workspace-config.json']
-const DEFAULT_FOLDER_NAME = 'GarbenNotes'
+const LEGACY_CONFIG_NAMES = ['garben-config.json', 'md-workspace-config.json']
+const DEFAULT_FOLDER_NAME = 'NotePluseNotes'
 /** 默认一级文件夹（物理子目录） */
 const DEFAULT_FOLDERS = ['个人', '工作', '今日待办', '长期待办', '记录']
 /** 「记录」类：日记/流水，不强制任务模板 */
@@ -17,7 +17,7 @@ function safeGetPath(name) {
       return window.ztools.getPath(name)
     }
   } catch (e) {
-    console.warn('[garben] getPath failed', name, e)
+    console.warn('[notepluse] getPath failed', name, e)
   }
   return null
 }
@@ -29,7 +29,7 @@ function getConfigDir() {
 function getConfigPath() {
   const dir = getConfigDir()
   if (safeGetPath('userData')) return path.join(dir, CONFIG_NAME)
-  return path.join(dir, '.garben-config.json')
+  return path.join(dir, '.notepluse-config.json')
 }
 
 function legacyConfigPaths() {
@@ -40,7 +40,10 @@ function legacyConfigPaths() {
     paths.push(path.join(dir, name))
     if (!inUserData) paths.push(path.join(dir, '.' + name))
   }
-  if (inUserData) paths.push(path.join(os.homedir(), '.md-workspace-config.json'))
+  if (inUserData) {
+    paths.push(path.join(os.homedir(), '.garben-config.json'))
+    paths.push(path.join(os.homedir(), '.md-workspace-config.json'))
+  }
   return paths
 }
 
@@ -50,7 +53,7 @@ function readConfigFile(configPath) {
       return JSON.parse(fs.readFileSync(configPath, 'utf8'))
     }
   } catch (e) {
-    console.error('[garben] readConfig failed', configPath, e)
+    console.error('[notepluse] readConfig failed', configPath, e)
   }
   return null
 }
@@ -66,9 +69,9 @@ function readConfig() {
       try {
         fs.mkdirSync(path.dirname(configPath), { recursive: true })
         fs.writeFileSync(configPath, JSON.stringify(data, null, 2), 'utf8')
-        console.info('[garben] migrated config from', legacy)
+        console.info('[notepluse] migrated config from', legacy)
       } catch (e) {
-        console.warn('[garben] config migrate write failed', e)
+        console.warn('[notepluse] config migrate write failed', e)
       }
       return data
     }
@@ -429,7 +432,7 @@ function openInFolder(filePath) {
       return true
     }
   } catch (e) {
-    console.warn('[garben] openInFolder failed', e)
+    console.warn('[notepluse] openInFolder failed', e)
   }
   return false
 }
@@ -448,7 +451,7 @@ function chooseNotesRoot() {
       return null
     }
   } catch (e) {
-    console.warn('[garben] chooseNotesRoot failed', e)
+    console.warn('[notepluse] chooseNotesRoot failed', e)
   }
   return null
 }

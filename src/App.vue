@@ -70,7 +70,7 @@ function applyPluginHeight() {
     // 笔记工作台需要足够高度；宿主可再拖拽
     window.ztools?.setExpendHeight?.(760)
   } catch (e) {
-    console.warn('[garben] setExpendHeight failed', e)
+    console.warn('[notepluse] setExpendHeight failed', e)
   }
 }
 
