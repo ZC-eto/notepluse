@@ -5745,3 +5745,187 @@ html[data-density='compact'] .md-body .task-block-boundary {
     grid-template-columns: var(--rail) minmax(0, 1fr) !important;
   }
 }
+
+/* ========================================================================== */
+/* View density: resizable detail sheets + library edge + gantt timeline       */
+/* ========================================================================== */
+
+/* Library edge chevron (between rail/library and main) */
+.library-edge-toggle {
+  position: relative;
+  z-index: 6;
+  align-self: center;
+  width: 14px;
+  min-width: 14px;
+  height: 48px;
+  margin: 0 -1px 0 -1px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 0 8px 8px 0;
+  background: color-mix(in srgb, var(--surface) 88%, var(--paper-deep));
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background .14s ease, color .14s ease, border-color .14s ease;
+}
+.app-shell[data-library='closed'] .library-edge-toggle {
+  /* sits after rail when library closed */
+  grid-column: 2;
+  grid-row: 1;
+  margin-left: -1px;
+  border-radius: 0 8px 8px 0;
+}
+.app-shell[data-library='open'] .library-edge-toggle {
+  /* after library column */
+}
+.library-edge-toggle:hover {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--line-strong);
+}
+.library-edge-arrow {
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+/* Re-flow shell so edge toggle sits in grid without breaking columns */
+.app-shell {
+  grid-template-columns: var(--rail) 0px minmax(0, 1fr) !important;
+}
+.app-shell[data-library='closed'] {
+  grid-template-columns: var(--rail) 14px minmax(0, 1fr) !important;
+}
+.app-shell[data-library='open'] {
+  grid-template-columns: var(--rail) minmax(200px, var(--sidebar)) 14px minmax(0, 1fr) !important;
+}
+.app-shell[data-library='closed'] .library-drawer {
+  display: none !important;
+}
+.app-shell > .work-rail { grid-column: 1; }
+.app-shell[data-library='open'] > .library-drawer { grid-column: 2; }
+.app-shell[data-library='closed'] > .library-edge-toggle { grid-column: 2; }
+.app-shell[data-library='open'] > .library-edge-toggle { grid-column: 3; }
+.app-shell[data-library='closed'] > .main-pane { grid-column: 3; }
+.app-shell[data-library='open'] > .main-pane { grid-column: 4; }
+.app-shell > .library-backdrop { grid-column: 1 / -1; }
+
+/* Bottom detail sheets: drag handle + no page-scroll of huge inspector */
+.todo-row-detail,
+.gantt-task-panel,
+.cal-task-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(52vh, 480px);
+  resize: vertical;
+  overflow: auto;
+  border: 1px solid var(--line) !important;
+  border-radius: 10px 10px 0 0 !important;
+  background: var(--surface) !important;
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.18) !important;
+}
+
+.todo-row-detail {
+  margin: 4px 0 8px;
+  max-height: min(44vh, 420px);
+}
+
+.gantt-task-panel {
+  margin-top: 0 !important;
+  max-height: min(42vh, 400px) !important;
+}
+
+.cal-task-panel {
+  margin-top: 8px;
+}
+
+.todo-row-detail .task-inspector,
+.gantt-task-panel .task-inspector,
+.cal-task-panel .task-inspector {
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* Hide redundant outer chrome around nested inspector */
+.gantt-panel-head,
+.gantt-panel-dates,
+.gantt-task-panel-actions,
+.cal-task-panel-actions,
+.todo-inspector-actions {
+  padding: 6px 10px !important;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 90%, var(--surface-2));
+}
+.gantt-task-panel-actions,
+.cal-task-panel-actions,
+.todo-inspector-actions {
+  border-bottom: 0;
+  border-top: 1px solid var(--line);
+  justify-content: flex-end;
+}
+
+/* Gantt: force horizontal scroll area, denser day cells */
+.gantt-right {
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  overscroll-behavior-x: contain;
+}
+.gantt-timeline {
+  min-width: max(100%, 42 * 36px) !important;
+}
+.gantt-bar {
+  cursor: grab;
+}
+.gantt-bar.dragging {
+  cursor: grabbing;
+  opacity: 0.92;
+  z-index: 3;
+}
+.gantt-handle {
+  width: 8px !important;
+  min-width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  border-radius: 4px;
+  opacity: 0;
+  background: rgba(255, 255, 255, 0.35);
+}
+.gantt-bar:hover .gantt-handle,
+.gantt-bar.selected .gantt-handle,
+.gantt-bar.dragging .gantt-handle {
+  opacity: 1;
+}
+.gantt-label[draggable='true'] {
+  cursor: grab;
+}
+.gantt-label[draggable='true']:active {
+  cursor: grabbing;
+}
+
+/* Settings panel: cooler surface alignment */
+.settings-panel,
+.settings-drawer,
+.sheet-panel {
+  border-color: var(--line) !important;
+  background: var(--surface) !important;
+}
+
+/* Soften harsh orange selection rings on todo rows if any */
+.todo-row.open,
+.todo-row.is-expanded {
+  outline: none;
+  box-shadow: inset 2px 0 0 var(--workline);
+  background: color-mix(in srgb, var(--accent-soft) 35%, transparent);
+}
+
+@media (max-width: 900px) {
+  .app-shell,
+  .app-shell[data-library='open'] {
+    grid-template-columns: var(--rail) minmax(168px, 200px) 14px minmax(0, 1fr) !important;
+  }
+  .app-shell[data-library='closed'] {
+    grid-template-columns: var(--rail) 14px minmax(0, 1fr) !important;
+  }
+}

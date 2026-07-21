@@ -231,3 +231,29 @@ export function removeTask(markdown: string, taskId: string): string {
   lines.splice(task.lineIndex, 1)
   return lines.join(eol)
 }
+
+/**
+ * 在同一 Task Block 内交换两条可写任务的行顺序。
+ * 跨 block / 跨笔记 / 不可写时安全 no-op。
+ */
+export function reorderTasksInBlock(
+  markdown: string,
+  fromTaskId: string,
+  toTaskId: string,
+): string {
+  if (!fromTaskId || !toTaskId || fromTaskId === toTaskId) return markdown
+  const from = findWritableTaskById(markdown, fromTaskId)
+  const to = findWritableTaskById(markdown, toTaskId)
+  if (!from || !to) return markdown
+  if (from.blockId !== to.blockId) return markdown
+  if (from.lineIndex === to.lineIndex) return markdown
+  const eol = lineEnding(markdown)
+  const lines = markdown.split(/\r?\n/)
+  const a = from.lineIndex
+  const b = to.lineIndex
+  if (a < 0 || b < 0 || a >= lines.length || b >= lines.length) return markdown
+  const tmp = lines[a]
+  lines[a] = lines[b]
+  lines[b] = tmp
+  return lines.join(eol)
+}

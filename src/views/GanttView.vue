@@ -11,6 +11,10 @@ import { globalTaskKey } from '../core/globalTasks'
 
 const ws = inject('workspace') as ReturnType<typeof useWorkspace>
 const dayWidth = 36
+/** 时间轴至少展示的天数（可横向滚动） */
+const MIN_TIMELINE_DAYS = 42
+const PAD_BEFORE = 7
+const PAD_AFTER = 21
 const scope = ref<'current' | 'all'>('current')
 
 const draftTitle = ref('')
@@ -167,7 +171,9 @@ function bounds(entry: GanttEntry): { start: Date; end: Date } {
 const range = computed(() => {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  if (!scheduledTasks.value.length) return { start: addDays(today, -2), end: addDays(today, 18) }
+  if (!scheduledTasks.value.length) {
+    return { start: addDays(today, -PAD_BEFORE), end: addDays(today, MIN_TIMELINE_DAYS - PAD_BEFORE - 1) }
+  }
 
   let min = today.getTime()
   let max = today.getTime()
@@ -176,7 +182,14 @@ const range = computed(() => {
     min = Math.min(min, start.getTime())
     max = Math.max(max, end.getTime())
   }
-  return { start: addDays(new Date(min), -1), end: addDays(new Date(max), 4) }
+  let start = addDays(new Date(min), -PAD_BEFORE)
+  let end = addDays(new Date(max), PAD_AFTER)
+  // 保证至少 MIN_TIMELINE_DAYS 天，避免只剩几天格
+  const span = dayDiff(end, start) + 1
+  if (span < MIN_TIMELINE_DAYS) {
+    end = addDays(start, MIN_TIMELINE_DAYS - 1)
+  }
+  return { start, end }
 })
 
 const days = computed(() => {
@@ -255,6 +268,44 @@ function selectEntry(entry: GanttEntry, mode: 'open' | 'toggle' = 'toggle') {
   selectedTaskKey.value = selectedTaskKey.value === id ? null : id
 }
 
+/** 单击条：只选中不高开详情；双击 / Enter 才打开详情。 */
+function onBarClick(entry: GanttEntry, event: MouseEvent) {
+  if (suppressBarClick) {
+    suppressBarClick = false
+    return
+  }
+  // detail>=2 是双击序列中的第二次 click，交给 dblclick
+  if (event.detail >= 2) return
+  // 单击：仅选中（高亮），不强制开/关详情；若已开别的详情则切到本条
+  const id = rowId(entry.task)
+  if (selectedTaskKey.value && selectedTaskKey.value !== id) {
+    selectedTaskKey.value = id
+    return
+  }
+  // 已选中时单击不关详情，避免拖完误触；关详情用关闭钮 / Esc / 再双击
+  selectedTaskKey.value = id
+}
+
+function onBarDblClick(entry: GanttEntry, event: MouseEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+  if (suppressBarClick) {
+    suppressBarClick = false
+    return
+  }
+  const id = rowId(entry.task)
+  selectedTaskKey.value = selectedTaskKey.value === id ? null : id
+}
+
+function onLabelClick(entry: GanttEntry) {
+  // 左侧任务名：单击选中并打开详情
+  selectEntry(entry, 'open')
+}
+
+function onLabelDblClick(entry: GanttEntry) {
+  selectEntry(entry, 'toggle')
+}
+
 function clearSelection() {
   selectedTaskKey.value = null
 }
@@ -309,6 +360,7 @@ function entryAriaLabel(entry: GanttEntry) {
 function onEntryKeydown(entry: GanttEntry, event: KeyboardEvent) {
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
+    // 键盘：Enter 打开/关闭详情
     selectEntry(entry, 'toggle')
     return
   }
@@ -354,6 +406,8 @@ function onPointerDown(entry: GanttEntry, mode: DragMode, event: PointerEvent) {
   if (entry.kind !== 'range' || !canWrite(entry.task)) return
   event.preventDefault()
   event.stopPropagation()
+  // 拖拽时不高开详情：只标记选中用于高亮
+  selectedTaskKey.value = rowId(entry.task)
   const start = displayStart(entry.task)
   const end = displayEnd(entry.task)
   if (!isLocalDate(start) || !isLocalDate(end) || start >= end) return
@@ -418,9 +472,9 @@ function onPointerUp() {
   const moved = state.draftStart !== state.originStart || state.draftEnd !== state.originEnd
   if (moved) {
     commitRange(state.entry.task, state.draftStart, state.draftEnd)
-    // Drag gesture ends with a synthetic click — don't toggle the detail panel closed.
+    // 拖完会冒泡 click：吞掉，避免误开/关详情
     suppressBarClick = true
-    window.setTimeout(() => { suppressBarClick = false }, 0)
+    window.setTimeout(() => { suppressBarClick = false }, 120)
   }
   window.setTimeout(() => delete draftMap[id], 250)
 }
@@ -519,6 +573,52 @@ function weekday(date: Date) {
   return ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
 }
 
+function onRowDragStart(entry: GanttEntry, event: DragEvent) {
+  if (!canWrite(entry.task) || !entry.task.explicitId) {
+    event.preventDefault()
+    return
+  }
+  event.dataTransfer?.setData('text/mdw-task-id', entry.task.id)
+  event.dataTransfer?.setData('text/plain', entry.task.id)
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+}
+
+function onRowDragOver(event: DragEvent) {
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+}
+
+function onRowDrop(target: GanttEntry, event: DragEvent) {
+  event.preventDefault()
+  const fromId = event.dataTransfer?.getData('text/mdw-task-id') || event.dataTransfer?.getData('text/plain')
+  if (!fromId || fromId === target.task.id) return
+  const source = scheduledTasks.value.find((e) => e.task.id === fromId)
+  if (!source) return
+  if (!canWrite(source.task) || !canWrite(target.task)) {
+    scheduleMessage.value = '只读任务不能调整顺序。'
+    return
+  }
+  if (source.task.blockId !== target.task.blockId) {
+    scheduleMessage.value = '只能在同一任务组内调整顺序。'
+    return
+  }
+  if ('notePath' in source.task || 'notePath' in target.task) {
+    if (!('notePath' in source.task) || !('notePath' in target.task)) return
+    if (source.task.notePath !== target.task.notePath) {
+      scheduleMessage.value = '只能在同一篇笔记内调整顺序。'
+      return
+    }
+    void (ws as any).reorderGlobalTasks?.(source.task, target.task)
+  } else {
+    ;(ws as any).reorderTasks?.(source.task.id, target.task.id)
+  }
+  scheduleMessage.value = '已调整任务顺序。'
+}
+
+function weekdayLabel(date: Date) {
+  return weekday(date)
+}
+
 onMounted(() => {
   window.addEventListener('keydown', onGanttKeydown)
   window.addEventListener('mdw:escape-layer', clearSelection as any)
@@ -602,14 +702,19 @@ onBeforeUnmount(() => {
               class="gantt-label"
               :class="{ done: entry.task.done, 'is-readonly': !canWrite(entry.task) }"
               :style="{ paddingInlineStart: `${12 + entry.task.depth * 12}px` }"
+              :draggable="canWrite(entry.task) && !!entry.task.explicitId"
+              @dragstart="onRowDragStart(entry, $event)"
+              @dragover="onRowDragOver"
+              @drop="onRowDrop(entry, $event)"
             >
               <input type="checkbox" :checked="entry.task.done" :disabled="!canWrite(entry.task)" :aria-label="`切换 ${displayTaskTitle(entry.task.title)} 完成状态`" @change="toggleTask(entry.task)" />
               <button
                 type="button"
                 class="gantt-label-select"
                 :class="{ selected: isEntrySelected(entry) }"
-                :title="barTitle(entry)"
-                @click="selectEntry(entry)"
+                :title="barTitle(entry) + (canWrite(entry.task) ? '\n拖拽左侧可调整顺序' : '')"
+                @click="onLabelClick(entry)"
+                @dblclick.prevent="onLabelDblClick(entry)"
               >
                 <span class="gantt-label-text">
                   <span :style="{ color: taskColor(entry.task) }" aria-hidden="true">{{ entry.kind === 'milestone' ? '◆' : '—' }}</span>
@@ -647,19 +752,32 @@ onBeforeUnmount(() => {
                   class="gantt-bar"
                   :class="{ done: entry.task.done, dragging: drag?.entry && rowId(drag.entry.task) === rowId(entry.task), selected: isEntrySelected(entry), 'is-readonly': !canWrite(entry.task) }"
                   :style="barStyle(entry)"
-                  :title="barTitle(entry)"
+                  :title="barTitle(entry) + '\n拖动移动 · 拖手柄改长度 · 双击开详情'"
                   role="button"
                   tabindex="0"
                   :aria-label="entryAriaLabel(entry)"
-                  @click="selectEntry(entry)"
+                  @click="onBarClick(entry, $event)"
+                  @dblclick="onBarDblClick(entry, $event)"
                   @keydown="onEntryKeydown(entry, $event)"
-                  @pointerdown="selectEntry(entry, 'open'); onPointerDown(entry, 'move', $event)"
+                  @pointerdown="onPointerDown(entry, 'move', $event)"
                 >
-                  <span class="gantt-handle left" :aria-hidden="!canWrite(entry.task)" @pointerdown.stop="selectEntry(entry, 'open'); onPointerDown(entry, 'resize-start', $event)" />
+                  <span class="gantt-handle left" :aria-hidden="!canWrite(entry.task)" title="拖动调整开始日" @pointerdown.stop="onPointerDown(entry, 'resize-start', $event)" />
                   <span class="gantt-bar-label">{{ displayTaskTitle(entry.task.title) }}</span>
-                  <span class="gantt-handle right" :aria-hidden="!canWrite(entry.task)" @pointerdown.stop="selectEntry(entry, 'open'); onPointerDown(entry, 'resize-end', $event)" />
+                  <span class="gantt-handle right" :aria-hidden="!canWrite(entry.task)" title="拖动调整结束日" @pointerdown.stop="onPointerDown(entry, 'resize-end', $event)" />
                 </div>
-                <div v-else class="gantt-milestone" :class="{ selected: isEntrySelected(entry), 'is-readonly': !canWrite(entry.task) }" :style="barStyle(entry)" :title="barTitle(entry)" role="button" tabindex="0" :aria-label="entryAriaLabel(entry)" @click="selectEntry(entry)" @keydown="onEntryKeydown(entry, $event)" />
+                <div
+                  v-else
+                  class="gantt-milestone"
+                  :class="{ selected: isEntrySelected(entry), 'is-readonly': !canWrite(entry.task) }"
+                  :style="barStyle(entry)"
+                  :title="barTitle(entry) + '\n双击开详情'"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="entryAriaLabel(entry)"
+                  @click="onBarClick(entry, $event)"
+                  @dblclick="onBarDblClick(entry, $event)"
+                  @keydown="onEntryKeydown(entry, $event)"
+                />
               </div>
             </template>
             <div v-else class="gantt-row gantt-row-placeholder" aria-hidden="true">

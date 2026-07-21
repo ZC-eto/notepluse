@@ -19,6 +19,7 @@ import {
   applyTaskPatch,
   ensureTaskIds,
   removeTask,
+  reorderTasksInBlock,
   toggleTaskDone,
   updateTaskDue,
   updateTaskSchedule,
@@ -208,5 +209,14 @@ describe('minimal Task Block write-back', () => {
     const next = removeTask(md, 'delete')
     assert.deepEqual(parseTasks(next).map((task) => task.id), ['keep'])
     assert.ok(next.includes('<!-- /mdw:tasks -->'))
+  })
+
+  it('reorders two writable tasks inside the same block', () => {
+    const md = block('ord', '- [ ] 甲 @id(a)\n- [ ] 乙 @id(b)\n- [ ] 丙 @id(c)')
+    const next = reorderTasksInBlock(md, 'a', 'b')
+    assert.deepEqual(parseTasks(next).map((t) => t.id), ['b', 'a', 'c'])
+    // cross-block no-op
+    const multi = [block('x', '- [ ] X @id(x)'), block('y', '- [ ] Y @id(y)')].join('\n')
+    assert.equal(reorderTasksInBlock(multi, 'x', 'y'), multi)
   })
 })

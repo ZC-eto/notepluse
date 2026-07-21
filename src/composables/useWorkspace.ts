@@ -23,6 +23,7 @@ import {
   updateTaskSchedule,
   applyTaskPatch,
   removeTask,
+  reorderTasksInBlock,
 } from '../core/writeTasks'
 import type { Task, TaskPatch } from '../core/types'
 import { askConfirm, askPrompt } from './uiDialog'
@@ -1589,6 +1590,25 @@ export function useWorkspace() {
     setContent(removeTask(content.value, taskId))
   }
 
+  /** 同一任务组内交换两行顺序（甘特左侧拖拽换行）。 */
+  function reorderTasks(fromTaskId: string, toTaskId: string) {
+    if (!fromTaskId || !toTaskId || fromTaskId === toTaskId) return
+    setContent(reorderTasksInBlock(content.value, fromTaskId, toTaskId))
+  }
+
+  async function reorderGlobalTasks(from: GlobalTask, to: GlobalTask) {
+    if (!from || !to) return
+    if (from.notePath !== to.notePath) {
+      status.value = '只能在同一篇笔记内调整任务顺序'
+      return
+    }
+    if (from.blockId !== to.blockId) {
+      status.value = '只能在同一任务组内调整顺序'
+      return
+    }
+    applyToNote(from.notePath, (md) => reorderTasksInBlock(md, from.id, to.id))
+  }
+
   function onToggleGlobalTask(task: GlobalTask) {
     applyToNote(task.notePath, (md) => toggleTaskDone(md, task.id))
   }
@@ -1703,6 +1723,8 @@ export function useWorkspace() {
     onScheduleChange,
     onAddTask,
     onRemoveTask,
+    reorderTasks,
+    reorderGlobalTasks,
     onToggleGlobalTask,
     onScheduleGlobalTask,
     patchGlobalTask,

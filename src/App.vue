@@ -428,6 +428,17 @@ onBeforeUnmount(() => {
     >
       <NoteSidebar />
     </div>
+    <button
+      type="button"
+      class="library-edge-toggle"
+      :class="{ open: libraryOpen }"
+      :title="libraryOpen ? '收起笔记库 · Ctrl+\\' : '展开笔记库 · Ctrl+\\'"
+      :aria-label="libraryOpen ? '收起笔记库' : '展开笔记库'"
+      :aria-pressed="libraryOpen"
+      @click="toggleLibrary"
+    >
+      <span class="library-edge-arrow" aria-hidden="true">{{ libraryOpen ? '‹' : '›' }}</span>
+    </button>
     <!-- 宽屏为挤压布局，不需要遮罩；遮罩仅极窄覆盖模式使用（CSS 控制） -->
     <button
       v-if="libraryOpen"
