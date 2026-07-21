@@ -15,7 +15,20 @@ const emit = defineEmits<{
 
 const ws = inject('workspace') as ReturnType<typeof useWorkspace>
 
+/** 顶栏主标题：笔记视图用文件名；投影视图用视图名（不要全局绑死当前打开的笔记文件名） */
 const docTitle = computed(() => {
+  const view = ws.view
+  if (view === 'todo') return '待办'
+  if (view === 'gantt') return '甘特'
+  if (view === 'calendar') return '日历'
+  const name = ws.activeNote?.name
+  if (!name) return ''
+  return name.replace(/\.md$/i, '')
+})
+
+/** 投影视图下，若已打开某篇笔记，用次要文案提示「当前关联笔记」（不抢主标题） */
+const contextNoteHint = computed(() => {
+  if (ws.view === 'editor') return ''
   const name = ws.activeNote?.name
   if (!name) return ''
   return name.replace(/\.md$/i, '')
@@ -68,9 +81,16 @@ function onRetrySave() {
         <span>笔记库</span>
         <em v-if="noteCount" class="library-count">{{ noteCount }}</em>
       </button>
-      <h1 class="doc-title" :title="docTitle || '未选择笔记'">
-        {{ docTitle || '选择一篇笔记' }}
-      </h1>
+      <div class="doc-title-wrap">
+        <h1 class="doc-title" :title="docTitle || (ws.view === 'editor' ? '未选择笔记' : docTitle)">
+          {{ docTitle || (ws.view === 'editor' ? '选择一篇笔记' : '') }}
+        </h1>
+        <span
+          v-if="contextNoteHint"
+          class="doc-context-note"
+          :title="'当前打开：' + contextNoteHint"
+        >{{ contextNoteHint }}</span>
+      </div>
     </div>
 
     <div class="top-actions">

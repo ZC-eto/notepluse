@@ -65,6 +65,8 @@ const onboardingCompleted = ref(false)
 const onboardingOpen = ref(false)
 /** 桌面小窗偏好（宿主 createBrowserWindow） */
 const miniWindowEnabled = ref(false)
+/** 0.35–1 desktop sticky surface opacity */
+const miniWindowOpacity = ref(0.88)
 let miniWindowRef: any = null
 /** 内容撤销栈（源码级可靠） */
 const undoStack = ref<string[]>([])
@@ -265,6 +267,9 @@ export function useWorkspace() {
       }
       if (typeof cfg.libraryDefaultOpen === 'boolean') libraryDefaultOpen.value = cfg.libraryDefaultOpen
       if (typeof cfg.miniWindowEnabled === 'boolean') miniWindowEnabled.value = cfg.miniWindowEnabled
+      if (typeof cfg.miniWindowOpacity === 'number' && cfg.miniWindowOpacity >= 0.35 && cfg.miniWindowOpacity <= 1) {
+        miniWindowOpacity.value = cfg.miniWindowOpacity
+      }
       if (isUiDensity(cfg.uiDensity)) uiDensity.value = cfg.uiDensity
       if (typeof cfg.onboardingCompleted === 'boolean') onboardingCompleted.value = cfg.onboardingCompleted
       applyDensityToDom(uiDensity.value)
@@ -289,6 +294,7 @@ export function useWorkspace() {
       enabledViews: enabledViews.value.slice(),
       libraryDefaultOpen: libraryDefaultOpen.value,
       miniWindowEnabled: miniWindowEnabled.value,
+      miniWindowOpacity: miniWindowOpacity.value,
       uiDensity: uiDensity.value,
       onboardingCompleted: onboardingCompleted.value,
     }
@@ -552,6 +558,7 @@ export function useWorkspace() {
             if (miniWindowRef && typeof miniWindowRef.setBackgroundColor === 'function') {
               miniWindowRef.setBackgroundColor('#00000000')
             }
+            applyMiniWindowOpacity()
           } catch {
             /* ignore host quirks */
           }
@@ -582,6 +589,58 @@ export function useWorkspace() {
     if (next) openMiniWindow()
     else closeMiniWindow()
   }
+
+  function applyMiniWindowOpacity(opacity?: number) {
+    const o = typeof opacity === 'number' ? opacity : miniWindowOpacity.value
+    const clamped = Math.min(1, Math.max(0.35, o))
+    try {
+      if (miniWindowRef && typeof miniWindowRef.setOpacity === 'function') {
+        miniWindowRef.setOpacity(clamped)
+      }
+    } catch { /* ignore */ }
+    try {
+      if (miniWindowRef && typeof miniWindowRef.webContents?.executeJavaScript === 'function') {
+        miniWindowRef.webContents.executeJavaScript(
+          `document.documentElement.style.setProperty('--mini-opacity', '${clamped}');`
+        )
+      }
+    } catch { /* ignore */ }
+  }
+
+  function setMiniWindowOpacity(opacity: number) {
+    const clamped = Math.min(1, Math.max(0.35, Number(opacity) || 0.88))
+    miniWindowOpacity.value = clamped
+    applyMiniWindowOpacity(clamped)
+    persistUiPrefs()
+    status.value = `便签透明度 ${Math.round(clamped * 100)}%`
+  }
+
+  function focusMainPluginWindow() {
+    try {
+      const z = window.ztools as any
+      if (typeof z?.showMainWindow === 'function') {
+        z.showMainWindow()
+        return true
+      }
+      if (typeof z?.showPlugin === 'function') {
+        z.showPlugin()
+        return true
+      }
+      if (typeof z?.openPlugin === 'function') {
+        z.openPlugin()
+        return true
+      }
+      // Electron BrowserWindow of plugin may expose parent
+      if (typeof z?.getCurrentWindow === 'function') {
+        const w = z.getCurrentWindow()
+        w?.show?.()
+        w?.focus?.()
+        return true
+      }
+    } catch { /* ignore */ }
+    return false
+  }
+
 
   function pushUndoSnapshot(prev: string) {
     if (applyingHistory) return
@@ -1551,6 +1610,7 @@ export function useWorkspace() {
     onboardingCompleted,
     onboardingOpen,
     miniWindowEnabled,
+    miniWindowOpacity,
     lastDeleted,
     canUndo: computed(() => undoStack.value.length > 0),
     canRedo: computed(() => redoStack.value.length > 0),
@@ -1600,6 +1660,9 @@ export function useWorkspace() {
     openMiniWindow,
     closeMiniWindow,
     toggleMiniWindow,
+    setMiniWindowOpacity,
+    applyMiniWindowOpacity,
+    focusMainPluginWindow,
     ensureDemoSamples,
     undoContent,
     redoContent,

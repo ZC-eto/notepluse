@@ -94,20 +94,51 @@ function closeWindow() {
 
 function openMain() {
   try {
-    // 宿主：显示主搜索/插件窗
-    if (typeof (window as any).ztools?.showMainWindow === 'function') {
-      ;(window as any).ztools.showMainWindow()
+    const ok = (ws as any).focusMainPluginWindow?.()
+    if (ok) return
+  } catch { /* ignore */ }
+  try {
+    const z = window as any
+    if (typeof z.ztools?.showMainWindow === 'function') {
+      z.ztools.showMainWindow()
       return
     }
-    if (typeof (window as any).ztools?.showOpenDialog === 'function') {
-      /* no-op: keep sticky usable without main */
+    if (typeof z.ztools?.showPlugin === 'function') {
+      z.ztools.showPlugin()
+      return
+    }
+    if (typeof BroadcastChannel !== 'undefined') {
+      const ch = new BroadcastChannel('mdw-plugin')
+      ch.postMessage({ type: 'focus-main' })
+      ch.close()
     }
   } catch {
     /* ignore */
   }
 }
 
+function openTaskInMain(task: GlobalTask) {
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const ch = new BroadcastChannel('mdw-plugin')
+      ch.postMessage({
+        type: 'open-task',
+        notePath: task.notePath,
+        taskId: task.id,
+      })
+      ch.close()
+    }
+  } catch { /* ignore */ }
+  openMain()
+}
+
 onMounted(async () => {
+  try {
+    const o = Number((ws as any).miniWindowOpacity)
+    if (Number.isFinite(o)) {
+      document.documentElement.style.setProperty('--mini-opacity', String(Math.min(1, Math.max(0.35, o))))
+    }
+  } catch { /* ignore */ }
   await ws.refreshNotes()
   // 小窗独立进程/会话时定期刷新跨笔记缓存
   pollTimer = setInterval(() => {
@@ -131,10 +162,10 @@ onBeforeUnmount(() => {
     <header class="mini-sticky-head">
       <div class="mini-sticky-drag">
         <span class="mini-sticky-mark" aria-hidden="true" />
-        <div class="mini-sticky-titles">
+        <button type="button" class="mini-sticky-titles is-btn" title="打开主窗口" @click="openMain">
           <strong class="mini-sticky-title">今日便签</strong>
-          <span class="mini-sticky-sub">{{ openCount }}/{{ totalCount || 0 }} · {{ today.slice(5) }}</span>
-        </div>
+          <span class="mini-sticky-sub">{{ openCount }}/{{ totalCount || 0 }} · {{ today.slice(5) }} · 点此打开主窗</span>
+        </button>
       </div>
       <div class="mini-sticky-actions">
         <button type="button" class="mini-icon-btn" title="打开主窗口" aria-label="打开主窗口" @click="openMain">
@@ -171,10 +202,10 @@ onBeforeUnmount(() => {
             </svg>
           </span>
         </button>
-        <div class="mini-sticky-body">
+        <button type="button" class="mini-sticky-body is-btn" :title="'在主窗口打开：' + displayTaskTitle(task.title)" @click="openTaskInMain(task)">
           <div class="mini-sticky-task-title">{{ displayTaskTitle(task.title) }}</div>
           <div class="mini-sticky-meta">{{ metaLine(task) }}</div>
-        </div>
+        </button>
       </li>
     </ul>
 

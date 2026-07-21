@@ -281,6 +281,32 @@ onMounted(async () => {
   if ((ws as any).defaultEditorMode) ws.setEditorMode((ws as any).defaultEditorMode)
   // 默认收起侧栏；若设置要求默认打开再展开
   libraryOpen.value = Boolean((ws as any).libraryDefaultOpen)
+  // Mini sticky → main window bridge
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const ch = new BroadcastChannel('mdw-plugin')
+      ch.onmessage = (ev) => {
+        const data = ev?.data
+        if (!data || typeof data !== 'object') return
+        if (data.type === 'focus-main') {
+          try {
+            window.focus()
+            ;(window as any).ztools?.showMainWindow?.()
+          } catch { /* ignore */ }
+        }
+        if (data.type === 'open-task' && data.notePath) {
+          void (async () => {
+            try {
+              await ws.openNote(String(data.notePath))
+              ws.setView('todo')
+              window.focus()
+            } catch { /* ignore */ }
+          })()
+        }
+      }
+      ;(window as any).__mdwBroadcast = ch
+    }
+  } catch { /* ignore */ }
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('mdw:open-shortcuts', () => { shortcutsOpen.value = true })
 
