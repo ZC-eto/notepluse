@@ -22,44 +22,44 @@ const steps: Step[] = [
     id: 'welcome',
     title: '从笔记开始',
     body: 'Markdown 工作台先是本地写作。内容存在你的笔记文件夹里，不是云端数据库。',
-    target: '.work-rail .rail-nav-item.is-editor, .work-rail .rail-nav-item:first-child',
+    target: '.work-rail .rail-nav-item.is-editor, .rail-nav .rail-nav-item.is-editor, nav.work-rail button.rail-nav-item:first-of-type, .work-rail button:nth-child(1)',
     view: 'editor',
     forceEditor: true,
-    tip: '左侧「笔记」= 主工作面',
+    tip: '请看左侧导航的「笔记」',
   },
   {
     id: 'task-block',
     title: '用「任务组」声明可管理任务',
     body: '只有任务组里的 - [ ] 会进待办 / 日历 / 甘特。普通清单、代码示例不会被收录。',
-    target: '.editor-tool-block, button.editor-tool-block',
+    target: 'button.editor-tool-block, .editor-tool-block, .editor-toolbar button[aria-label*="任务组"], .editor-toolbar button[title*="任务组"]',
     view: 'editor',
     forceEditor: true,
-    tip: '点工具条「任务组」，或 Ctrl+Alt+T',
+    tip: '请看工具条上的「任务组」按钮（或 Ctrl+Alt+T）',
   },
   {
     id: 'todo',
     title: '待办按时间看',
     body: '收件箱=未排期；今日=今天相关；即将=未来承诺；全部=查找。标签和优先级写在任务属性里，会回写 Markdown。',
-    target: '.todo-scope, [aria-label="待办范围"], .scope-seg, .view-toolbar',
+    target: '[aria-label="待办范围"], .todo-view .view-toolbar, .todo-view header, .todo-view .scope-seg, .todo-view',
     view: 'todo',
-    tip: '添加任务时请选择写入的任务组',
+    tip: '请看待办顶部的「收件箱 / 今日 / 即将 / 全部」',
   },
   {
     id: 'dates',
     title: '四种日期，含义不同',
     body: '@date 单日 · @due 截止 · @start+@end 跨日 · 里程碑 @type(milestone)+@date。甘特只收跨日和里程碑。',
-    target: '.cal-toolbar, .calendar-view .view-toolbar, [aria-label="日历工具栏"]',
+    target: '[aria-label="日历工具栏"], .calendar-view .view-toolbar, .calendar-view header, .calendar-view',
     view: 'calendar',
-    tip: '改日期会写回源笔记',
+    tip: '请看日历顶部工具栏；改日期会写回源笔记',
   },
   {
     id: 'finish',
     title: '随时可再学一遍',
     body: '设置里可改默认首页、显示密度，并「重新开始引导」。准备好了就开始写。',
-    target: 'button[aria-label="打开设置"], .icon-action.settings, .top-actions button:last-child',
+    target: 'button[aria-label="打开设置"], button[title="打开设置"], .top-actions .settings-btn, .top-actions button[aria-label*="设置"]',
     view: 'editor',
     forceEditor: true,
-    tip: '设置 → 使用引导',
+    tip: '请看右上角齿轮「设置」→ 使用引导',
   },
 ]
 
@@ -123,6 +123,13 @@ async function activateStep(i: number) {
   goView(steps[i])
   await nextTick()
   scheduleMeasure()
+  // 布局/视图切换后再量一次，避免 selector 过早 miss
+  setTimeout(() => scheduleMeasure(), 180)
+  setTimeout(() => {
+    scheduleMeasure()
+    const btn = document.querySelector('.coach-card .btn-solid') as HTMLButtonElement | null
+    btn?.focus?.()
+  }, 320)
 }
 
 watch(
@@ -262,6 +269,9 @@ const cardStyle = computed(() => {
         </header>
         <p class="coach-body">{{ step.body }}</p>
         <p v-if="step.tip" class="coach-tip">{{ step.tip }}</p>
+        <p v-if="!hole.visible" class="coach-fallback">
+          当前界面未找到可高亮的控件（可能未打开对应视图）。请按上方提示操作，或点「下一步」继续。
+        </p>
         <footer class="coach-actions">
           <button type="button" class="btn-ghost sm" @click="skip">跳过</button>
           <div class="coach-nav">

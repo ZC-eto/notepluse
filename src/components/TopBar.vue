@@ -82,11 +82,17 @@ function onRetrySave() {
         <em v-if="noteCount" class="library-count">{{ noteCount }}</em>
       </button>
       <div class="doc-title-wrap">
-        <h1 class="doc-title" :title="docTitle || (ws.view === 'editor' ? '未选择笔记' : docTitle)">
+        <h1
+          class="doc-title"
+          :title="ws.view === 'editor'
+            ? (docTitle || '未选择笔记')
+            : (contextNoteHint ? (docTitle + ' · 当前笔记 ' + contextNoteHint) : docTitle)"
+        >
           {{ docTitle || (ws.view === 'editor' ? '选择一篇笔记' : '') }}
         </h1>
+        <!-- 投影视图只显示视图名；文件名仅作 title 提示，避免再占主栏 -->
         <span
-          v-if="contextNoteHint"
+          v-if="false && contextNoteHint"
           class="doc-context-note"
           :title="'当前打开：' + contextNoteHint"
         >{{ contextNoteHint }}</span>

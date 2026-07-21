@@ -5127,3 +5127,65 @@ html[data-density='compact'] .md-body .task-block-boundary {
 .mini-sticky-body.is-btn:hover .mini-sticky-task-title {
   color: var(--accent-ink);
 }
+
+/* ========================================================================== */
+/* v0.8.4 critique follow-ups                                                */
+/* ========================================================================== */
+
+.coach-fallback {
+  margin: 8px 16px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px dashed color-mix(in srgb, var(--warning) 45%, var(--line));
+  background: color-mix(in srgb, var(--warning-soft) 55%, var(--surface));
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 500;
+}
+
+.mini-focus-hint {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent-soft) 80%, transparent);
+  border-top: 1px solid var(--line);
+}
+
+.settings-fold {
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-2) 30%, var(--surface));
+  overflow: hidden;
+}
+.settings-fold-summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.settings-fold-summary::-webkit-details-marker { display: none; }
+.settings-fold-summary::before {
+  content: '▸ ';
+  color: var(--muted);
+}
+.settings-fold[open] > .settings-fold-summary::before {
+  content: '▾ ';
+}
+.settings-fold .settings-card.is-nested {
+  margin: 0 10px 10px;
+  border: 1px solid var(--line);
+}
+.settings-panel-v083 .settings-advanced-body .settings-card.is-nested {
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  box-shadow: none;
+}
+
+/* Softer diagnostics so first paint is not alarming */
+.task-block-status {
+  border-bottom-color: color-mix(in srgb, var(--line) 80%, transparent) !important;
+}

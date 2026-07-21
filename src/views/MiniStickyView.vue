@@ -8,7 +8,17 @@ import { globalTaskKey } from '../core/globalTasks'
 const ws = inject('workspace') as ReturnType<typeof useWorkspace>
 
 const tick = ref(0)
+const focusHint = ref('')
+let focusHintTimer: ReturnType<typeof setTimeout> | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
+
+function showFocusHint(msg: string) {
+  focusHint.value = msg
+  if (focusHintTimer) clearTimeout(focusHintTimer)
+  focusHintTimer = setTimeout(() => {
+    focusHint.value = ''
+  }, 3200)
+}
 
 function todayStr() {
   const now = new Date()
@@ -93,27 +103,40 @@ function closeWindow() {
 }
 
 function openMain() {
+  let ok = false
   try {
-    const ok = (ws as any).focusMainPluginWindow?.()
-    if (ok) return
+    ok = Boolean((ws as any).focusMainPluginWindow?.())
   } catch { /* ignore */ }
+  if (ok) {
+    showFocusHint('已尝试打开主窗口')
+    return
+  }
   try {
     const z = window as any
     if (typeof z.ztools?.showMainWindow === 'function') {
       z.ztools.showMainWindow()
+      showFocusHint('已尝试打开主窗口')
       return
     }
     if (typeof z.ztools?.showPlugin === 'function') {
       z.ztools.showPlugin()
+      showFocusHint('已尝试打开主窗口')
       return
     }
+    let broadcast = false
     if (typeof BroadcastChannel !== 'undefined') {
       const ch = new BroadcastChannel('mdw-plugin')
       ch.postMessage({ type: 'focus-main' })
       ch.close()
+      broadcast = true
+    }
+    if (broadcast) {
+      showFocusHint('已通知主窗口；若未出现，请从 ZTools 搜索再次打开「Markdown 工作台」')
+    } else {
+      showFocusHint('当前宿主无法直接唤起主窗，请从 ZTools 搜索打开「Markdown 工作台」')
     }
   } catch {
-    /* ignore */
+    showFocusHint('打开主窗失败，请从 ZTools 搜索打开插件')
   }
 }
 
@@ -154,6 +177,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   if (pollTimer) clearInterval(pollTimer)
+  if (focusHintTimer) clearTimeout(focusHintTimer)
 })
 </script>
 
@@ -214,8 +238,9 @@ onBeforeUnmount(() => {
       <p class="mini-sticky-empty-hint">在主窗口任务组中添加后会出现在这里</p>
     </div>
 
+    <p v-if="focusHint" class="mini-focus-hint" role="status">{{ focusHint }}</p>
     <footer class="mini-sticky-foot">
-      <span class="mini-sticky-hint">拖拽顶栏移动 · 置顶便签</span>
+      <span class="mini-sticky-hint">勾选完成 · 点标题/任务回主窗 · 拖拽顶栏移动</span>
     </footer>
   </div>
 </template>

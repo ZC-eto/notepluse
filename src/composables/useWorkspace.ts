@@ -467,8 +467,28 @@ export function useWorkspace() {
 
       let created = 0
       let skipped = 0
+      let repaired = 0
       for (const seed of seeds) {
-        if (notes.value.some(seed.match)) {
+        const existing = notes.value.find(seed.match)
+        if (existing) {
+          // 修复被排版往返弄坏的示例（多余任务组边界会触发诊断条）
+          try {
+            const disk = window.services?.readNote?.(existing.path)
+            const text = typeof disk === 'string' ? disk : ''
+            const openN = (text.match(/<!--\s*mdw:tasks\b/gi) || []).length
+            const closeN = (text.match(/<!--\s*\/mdw:tasks\s*-->/gi) || []).length
+            const broken = !text || openN !== closeN || openN === 0 || text.includes('@id(tmr')
+            if (broken && window.services?.writeNote) {
+              window.services.writeNote(existing.path, seed.body)
+              if (existing.path === activePath.value) {
+                content.value = seed.body
+                dirty.value = false
+              }
+              demoStore.set(existing.path, seed.body)
+              repaired += 1
+              continue
+            }
+          } catch { /* ignore repair failure */ }
           skipped += 1
           continue
         }
@@ -486,14 +506,18 @@ export function useWorkspace() {
         setView('todo')
         openedTodo = true
       }
-      if (created === 0) {
+      if (created === 0 && repaired === 0) {
         status.value = skipped
           ? openedTodo
             ? `示例已齐全（${skipped} 篇），已打开今日计划 → 待办`
             : `示例已齐全（${skipped} 篇）`
           : '示例笔记已存在'
       } else {
-        const base = `已创建 ${created} 篇示例` + (skipped ? `（跳过 ${skipped}）` : '')
+        const bits = []
+        if (created) bits.push(`新建 ${created}`)
+        if (repaired) bits.push(`修复 ${repaired}`)
+        if (skipped) bits.push(`跳过 ${skipped}`)
+        const base = `示例：${bits.join(' · ')}`
         status.value = openedTodo ? `${base}，已切换到待办视图` : base
       }
     } catch (e) {
@@ -630,12 +654,19 @@ export function useWorkspace() {
         z.openPlugin()
         return true
       }
-      // Electron BrowserWindow of plugin may expose parent
       if (typeof z?.getCurrentWindow === 'function') {
         const w = z.getCurrentWindow()
         w?.show?.()
         w?.focus?.()
         return true
+      }
+      // 主页面监听 BroadcastChannel('mdw-plugin')
+      if (typeof BroadcastChannel !== 'undefined') {
+        const ch = new BroadcastChannel('mdw-plugin')
+        ch.postMessage({ type: 'focus-main' })
+        ch.close()
+        // broadcast 不保证主窗仍存活，返回 false 让调用方提示用户
+        return false
       }
     } catch { /* ignore */ }
     return false
