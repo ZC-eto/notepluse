@@ -6,10 +6,11 @@ const CONFIG_NAME = 'notepluse-config.json'
 /** 旧版插件名遗留配置，启动时若存在则合并迁移一次 */
 const LEGACY_CONFIG_NAMES = ['garben-config.json', 'md-workspace-config.json']
 const DEFAULT_FOLDER_NAME = 'NotePluseNotes'
-/** 默认一级文件夹（物理子目录） */
-const DEFAULT_FOLDERS = ['个人', '工作', '今日待办', '长期待办', '记录']
+/** 默认一级文件夹：空库起步，用户自行新建 */
+const DEFAULT_FOLDERS = []
 /** 「记录」类：日记/流水，不强制任务模板 */
 const RECORD_FOLDER_NAMES = new Set(['记录'])
+const TODO_FOLDER_NAMES = new Set(['今日待办', '长期待办'])
 
 function safeGetPath(name) {
   try {
@@ -212,7 +213,7 @@ function getNotesRoot() {
   fs.mkdirSync(root, { recursive: true })
   ensureDefaultFolders(root)
   writeConfig({ notesRoot: root })
-  if (isNew) ensureSampleNote(root)
+  // 新库保持为空：不自动写入「快速开始」示例
   return root
 }
 

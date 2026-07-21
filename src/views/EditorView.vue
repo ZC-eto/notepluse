@@ -41,7 +41,7 @@ type ToolbarItem = {
 }
 
 /** 主条常驻；其余进 ⋯ 横向浮层（不换第二行） */
-const primaryToolbarIds = new Set(['h1', 'bold', 'italic', 'list', 'task', 'link', 'date'])
+const primaryToolbarIds = new Set(['h1', 'bold', 'italic', 'list', 'ol', 'task', 'link', 'date'])
 
 const toolbarItems: ToolbarItem[] = [
   { id: 'h1', label: 'H1', title: '一级标题 Ctrl+Alt+1', group: 'text', icon: 'h1' },
@@ -435,60 +435,88 @@ function handleWysiwygMarkdownShortcuts(e: KeyboardEvent): boolean {
 
   const sel = window.getSelection()
   if (!sel || !sel.isCollapsed || !sel.anchorNode) return false
-  // 已在列表里不再二次转换
   if (isInListItem(sel.anchorNode)) return false
 
-  // 取当前块开头到光标的文本
-  let block: Node | null = sel.anchorNode
-  if (block.nodeType === Node.TEXT_NODE) block = block.parentNode
-  while (block && block !== wysiwygEl.value) {
-    if (
-      block instanceof HTMLElement &&
-      /^(P|DIV|H1|H2|H3|H4|H5|H6)$/i.test(block.tagName) &&
-      !block.classList.contains('task-item')
-    ) {
-      break
+  // 优先用「当前文本节点从开头到光标」—— contenteditable 里块级 range 常拿不到 "1. "
+  let prefix = ''
+  const node = sel.anchorNode
+  if (node && node.nodeType === Node.TEXT_NODE) {
+    const text = node.textContent || ''
+    const offset = Math.min(sel.anchorOffset, text.length)
+    // 只看本行（最后一个 \n 之后）
+    const lineStart = text.lastIndexOf('\n', offset - 1) + 1
+    prefix = text.slice(lineStart, offset)
+  } else {
+    let block: Node | null = node
+    if (block && block.nodeType === Node.TEXT_NODE) block = block.parentNode
+    while (block && block !== wysiwygEl.value) {
+      if (
+        block instanceof HTMLElement &&
+        /^(P|DIV|H1|H2|H3|H4|H5|H6|LI)$/i.test(block.tagName) &&
+        !block.classList.contains('task-item')
+      ) {
+        break
+      }
+      block = block.parentNode
     }
-    block = block.parentNode
+    if (!(block instanceof HTMLElement) || block === wysiwygEl.value) return false
+    try {
+      const range = sel.getRangeAt(0)
+      const pre = document.createRange()
+      pre.selectNodeContents(block)
+      pre.setEnd(range.endContainer, range.endOffset)
+      prefix = pre.toString()
+    } catch {
+      return false
+    }
   }
-  if (!(block instanceof HTMLElement) || block === wysiwygEl.value) return false
 
-  const range = sel.getRangeAt(0)
-  const pre = document.createRange()
-  pre.selectNodeContents(block)
-  pre.setEnd(range.endContainer, range.endOffset)
-  const prefix = pre.toString()
+  // 去掉不可见字符
+  prefix = prefix.replace(/[​﻿]/g, '')
+  // 允许行首空白
+  const trimmedStart = prefix.replace(/^\s+/, '')
+  // 整段必须是触发符（行首）
+  if (!/^\s*([-*+]|\d+[.)]|#{1,3})$/.test(prefix.trimEnd() === prefix ? prefix : trimmedStart) &&
+      !/^(\s*)([-*+]|\d+[.)]|#{1,3})$/.test(prefix)) {
+    // prefix 在按空格前，尚不含空格；检测 "1." 或 "-" 等
+  }
 
-  // "- " / "* " → ul；"1. " / "1) " → ol；"# " → h1 等
-  if (/^[-*+]\s$/.test(prefix)) {
-    e.preventDefault()
-    // 删掉触发字符
-    document.execCommand('delete')
-    document.execCommand('delete')
+  const marker = prefix.match(/^(\s*)([-*+]|#{1,3}|\d+[.)])$/)
+  if (!marker) return false
+
+  const kind = marker[2]
+  e.preventDefault()
+
+  // 删除触发字符（不含将要输入的空格，因为我们 preventDefault 了空格）
+  const deleteCount = kind.length + (marker[1]?.length || 0)
+  // 更稳：选中 marker 再删
+  try {
+    if (node && node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent || ''
+      const offset = Math.min(sel.anchorOffset, text.length)
+      const lineStart = text.lastIndexOf('\n', offset - 1) + 1
+      const r = document.createRange()
+      r.setStart(node, lineStart)
+      r.setEnd(node, offset)
+      sel.removeAllRanges()
+      sel.addRange(r)
+      document.execCommand('delete')
+    } else {
+      for (let i = 0; i < deleteCount; i++) document.execCommand('delete')
+    }
+  } catch {
+    for (let i = 0; i < Math.max(kind.length, 1); i++) document.execCommand('delete')
+  }
+
+  if (kind === '-' || kind === '*' || kind === '+') {
     document.execCommand('insertUnorderedList')
-    commitWysiwyg()
-    return true
-  }
-  if (/^\d+[.)]\s$/.test(prefix)) {
-    e.preventDefault()
-    // 删除 "N. "
-    const m = prefix.match(/^(\d+[.)]\s)$/)
-    if (m) {
-      for (let i = 0; i < m[1].length; i++) document.execCommand('delete')
-    }
+  } else if (/^\d+[.)]$/.test(kind)) {
     document.execCommand('insertOrderedList')
-    commitWysiwyg()
-    return true
+  } else if (/^#{1,3}$/.test(kind)) {
+    document.execCommand('formatBlock', false, `h${kind.length}`)
   }
-  if (/^#{1,3}\s$/.test(prefix)) {
-    e.preventDefault()
-    const level = (prefix.match(/#/g) || []).length
-    for (let i = 0; i < prefix.length; i++) document.execCommand('delete')
-    document.execCommand('formatBlock', false, `h${level}`)
-    commitWysiwyg()
-    return true
-  }
-  return false
+  commitWysiwyg()
+  return true
 }
 
 function onWysiwygKeydown(e: KeyboardEvent) {

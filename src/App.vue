@@ -28,8 +28,14 @@ provide('workspace', ws)
 const ui = useUiDialogState()
 /** 默认收起：写正文时不抢空间；需要时点「笔记库」打开 */
 const libraryOpen = ref(false)
+/** 左侧视图轨（笔记/待办/甘特/日历）可折叠 */
+const railCollapsed = ref(false)
 const shortcutsOpen = ref(false)
 const mobileLibraryToggle = ref<HTMLButtonElement | null>(null)
+
+function toggleRail() {
+  railCollapsed.value = !railCollapsed.value
+}
 
 const allViewMeta: {
   id: AppView
@@ -377,8 +383,9 @@ onBeforeUnmount(() => {
     class="app-shell"
     :data-view="ws.view"
     :data-library="libraryOpen ? 'open' : 'closed'"
+    :data-rail="railCollapsed ? 'collapsed' : 'open'"
   >
-    <nav class="work-rail" aria-label="诺麦笔记导航">
+    <nav v-show="!railCollapsed" class="work-rail" aria-label="诺麦笔记导航">
       <div class="rail-signature" title="诺麦笔记" aria-label="诺麦笔记">
         <span class="rail-mark" aria-hidden="true">N</span>
       </div>
@@ -415,11 +422,23 @@ onBeforeUnmount(() => {
               <path d="M4.5 9.5h15M9 5.5v3M15 5.5v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
             </svg>
           </span>
-          <!-- label only for a11y trees / screen readers; visually hidden via CSS -->
           <span class="rail-label">{{ v.label }}</span>
         </button>
       </div>
     </nav>
+
+    <!-- 折叠/展开左侧视图轨（笔记·待办·甘特·日历） -->
+    <button
+      type="button"
+      class="rail-edge-toggle"
+      :class="{ collapsed: railCollapsed }"
+      :title="railCollapsed ? '显示导航' : '隐藏导航'"
+      :aria-label="railCollapsed ? '显示导航' : '隐藏导航'"
+      :aria-pressed="railCollapsed"
+      @click="toggleRail"
+    >
+      <span class="rail-edge-arrow" aria-hidden="true">{{ railCollapsed ? '›' : '‹' }}</span>
+    </button>
 
     <div
       class="library-drawer"
@@ -428,17 +447,6 @@ onBeforeUnmount(() => {
     >
       <NoteSidebar />
     </div>
-    <button
-      type="button"
-      class="library-edge-toggle"
-      :class="{ open: libraryOpen }"
-      :title="libraryOpen ? '收起笔记库 · Ctrl+\\' : '展开笔记库 · Ctrl+\\'"
-      :aria-label="libraryOpen ? '收起笔记库' : '展开笔记库'"
-      :aria-pressed="libraryOpen"
-      @click="toggleLibrary"
-    >
-      <span class="library-edge-arrow" aria-hidden="true">{{ libraryOpen ? '‹' : '›' }}</span>
-    </button>
     <!-- 宽屏为挤压布局，不需要遮罩；遮罩仅极窄覆盖模式使用（CSS 控制） -->
     <button
       v-if="libraryOpen"

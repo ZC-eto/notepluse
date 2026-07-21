@@ -35,7 +35,10 @@ import {
 } from '../core/webdivSync'
 
 const DEMO_PLAN_PATH = 'demo://工作/快速开始'
-const DEFAULT_FOLDERS = ['个人', '工作', '今日待办', '长期待办', '记录']
+const DEFAULT_FOLDERS: string[] = []
+/** 兼容旧路径识别 kind；不再自动创建这些目录 */
+const KNOWN_TODO_FOLDERS = new Set(['今日待办', '长期待办'])
+const KNOWN_RECORD_FOLDERS = new Set(['记录'])
 
 const notes = ref<NoteMeta[]>([])
 const folders = ref<FolderMeta[]>([])
@@ -173,79 +176,25 @@ function sanitizeTitle(title: string): string {
 
 function folderKindOf(folder: string): FolderKind {
   const top = (folder || '').split(/[/\\]/)[0] || ''
-  if (top === '记录') return 'record'
-  if (top === '今日待办' || top === '长期待办') return 'todo'
+  if (KNOWN_RECORD_FOLDERS.has(top) || /记录|日记|journal/i.test(top)) return 'record'
+  if (KNOWN_TODO_FOLDERS.has(top) || /待办|todo|task/i.test(top)) return 'todo'
   return 'note'
 }
 
 function ensureFolderList(list: FolderMeta[]): FolderMeta[] {
-  const map = new Map(list.map((f) => [f.path, f]))
-  for (const name of DEFAULT_FOLDERS) {
-    if (!map.has(name)) {
-      map.set(name, { name, path: name, kind: folderKindOf(name) })
-    }
-  }
-  const order = new Map(DEFAULT_FOLDERS.map((n, i) => [n, i]))
-  return [...map.values()].sort((a, b) => {
-    const aTop = a.path.split('/')[0]
-    const bTop = b.path.split('/')[0]
-    const ai = order.has(aTop) ? (order.get(aTop) as number) : 1000
-    const bi = order.has(bTop) ? (order.get(bTop) as number) : 1000
-    if (ai !== bi) return ai - bi
-    return a.path.localeCompare(b.path, 'zh-CN')
-  })
+  // 不再强制注入默认文件夹；仅排序
+  return [...list].sort((a, b) => a.path.localeCompare(b.path, 'zh-CN'))
 }
 
 function demoInit() {
   notesRoot.value = notesRoot.value || '(demo)'
-  folders.value = ensureFolderList(
-    DEFAULT_FOLDERS.map((name) => ({ name, path: name, kind: folderKindOf(name) }))
-  )
+  folders.value = []
   if (!notes.value.length) {
-    const date = todayIso()
-    const body = demoContent(date)
-    const personalPath = 'demo://个人/购物与琐事'
-    const personalBody = samplePersonalBody()
-    const todayPath = `demo://今日待办/今日计划-${date}`
-    const d = new Date(`${date}T12:00:00`)
-    const add = (n: number) => {
-      const x = new Date(d)
-      x.setDate(x.getDate() + n)
-      return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
-    }
-    demoStore.set(DEMO_PLAN_PATH, body)
-    demoStore.set(personalPath, personalBody)
-    demoStore.set(todayPath, todayPlanBodyRich(date, add(-1), add(2)))
-    notes.value = [
-      {
-        name: '快速开始.md',
-        path: DEMO_PLAN_PATH,
-        mtime: Date.now(),
-        size: 1,
-        folder: '工作',
-        kind: 'note',
-      },
-      {
-        name: `今日计划-${date}.md`,
-        path: todayPath,
-        mtime: Date.now() - 500,
-        size: 1,
-        folder: '今日待办',
-        kind: 'todo',
-      },
-      {
-        name: '购物与琐事.md',
-        path: personalPath,
-        mtime: Date.now() - 1000,
-        size: 1,
-        folder: '个人',
-        kind: 'note',
-      },
-    ]
-    // 空库仅提供可选示例，不自动打开，避免默认标题绑架首屏
+    // 空库演示：不预置文件夹与示例
     activePath.value = ''
-    activeFolder.value = '工作'
+    activeFolder.value = ''
     content.value = ''
+    status.value = '空笔记库 · 可新建文件夹或笔记'
   }
 }
 

@@ -42,31 +42,32 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #0f1115;
-    --paper-deep: #0a0c0f;
-    --bg: var(--paper);
-    --surface: #15181e;
-    --surface-2: #1b1f27;
-    --ink: #eceef2;
-    --muted: #9aa3b0;
-    --faint: #6b7380;
-    --line: #2a303a;
-    --line-strong: #3d4654;
-    --accent: #7aa2c9;
-    --accent-hover: #9bb8d4;
-    --accent-soft: #1a2838;
-    --accent-ink: #c5d8ea;
+    /* Pure black luxury */
+    --paper: #000000;
+    --paper-deep: #050505;
+    --bg: #000000;
+    --surface: #0a0a0a;
+    --surface-2: #141414;
+    --ink: #f2f2f2;
+    --muted: #9a9a9a;
+    --faint: #666666;
+    --line: #1f1f1f;
+    --line-strong: #2e2e2e;
+    --accent: #7a9ec4;
+    --accent-hover: #9bb6d1;
+    --accent-soft: #121a22;
+    --accent-ink: #c8daf0;
     --danger: #f0978e;
-    --danger-soft: #3d1f1c;
+    --danger-soft: #2a1210;
     --warning: #e3b341;
-    --warning-soft: #3a2e12;
+    --warning-soft: #241c0a;
     --task-gray: #9aa3b0;
     --task-blue: #7aa2c9;
     --task-green: #6fbf94;
     --task-orange: #d4a05a;
     --task-red: #f0978e;
     --task-violet: #a894d4;
-    --shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 16px 40px rgba(0, 0, 0, 0.35);
+    --shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 16px 40px rgba(0, 0, 0, 0.55);
   }
 }
 
@@ -6456,4 +6457,145 @@ html[data-density='compact'] .md-body .task-block-boundary {
   background: var(--surface-2);
   color: var(--ink);
   box-shadow: none;
+}
+
+/* ========================================================================== */
+/* Rail collapse (view nav) + pure black surfaces + empty library              */
+/* ========================================================================== */
+html, body, #app {
+  background: var(--bg) !important;
+}
+body { background: var(--bg) !important; }
+
+.app-shell[data-rail='collapsed'] {
+  --rail: 0px;
+}
+.app-shell[data-rail='collapsed'] .work-rail {
+  display: none !important;
+  width: 0 !important;
+}
+
+.rail-edge-toggle {
+  position: relative;
+  z-index: 7;
+  align-self: center;
+  width: 16px;
+  min-width: 16px;
+  height: 56px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-left: 0;
+  border-radius: 0 10px 10px 0;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.rail-edge-toggle:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+.rail-edge-arrow {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+}
+.rail-edge-toggle.collapsed {
+  border-left: 1px solid var(--line);
+}
+
+/* Grid: rail | rail-toggle | library? | main  — library no longer uses edge for library */
+.app-shell {
+  grid-template-columns: var(--rail) 16px minmax(0, 1fr) !important;
+}
+.app-shell[data-library='open'] {
+  grid-template-columns: var(--rail) 16px minmax(200px, var(--sidebar)) minmax(0, 1fr) !important;
+}
+.app-shell[data-library='closed'] {
+  grid-template-columns: var(--rail) 16px minmax(0, 1fr) !important;
+}
+.app-shell[data-rail='collapsed'][data-library='closed'] {
+  grid-template-columns: 16px minmax(0, 1fr) !important;
+}
+.app-shell[data-rail='collapsed'][data-library='open'] {
+  grid-template-columns: 16px minmax(200px, var(--sidebar)) minmax(0, 1fr) !important;
+}
+
+.app-shell > .work-rail { grid-column: 1; }
+.app-shell > .rail-edge-toggle { grid-column: 2; }
+.app-shell[data-library='open'] > .library-drawer { grid-column: 3; }
+.app-shell[data-library='closed'] > .main-pane { grid-column: 3; }
+.app-shell[data-library='open'] > .main-pane { grid-column: 4; }
+.app-shell[data-rail='collapsed'][data-library='closed'] > .rail-edge-toggle { grid-column: 1; }
+.app-shell[data-rail='collapsed'][data-library='closed'] > .main-pane { grid-column: 2; }
+.app-shell[data-rail='collapsed'][data-library='open'] > .rail-edge-toggle { grid-column: 1; }
+.app-shell[data-rail='collapsed'][data-library='open'] > .library-drawer { grid-column: 2; }
+.app-shell[data-rail='collapsed'][data-library='open'] > .main-pane { grid-column: 3; }
+
+/* hide old library-edge if still in DOM */
+.library-edge-toggle { display: none !important; }
+
+/* Empty library empty-state */
+.lib-empty-hero {
+  padding: 28px 12px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.lib-empty-hero p { margin: 0 0 12px; font-weight: 400; }
+
+/* Inline folder create (no modal) */
+.folder-inline-create {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.folder-inline-create .icon-pick {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  max-width: 120px;
+}
+.folder-inline-create .icon-pick button {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.folder-inline-create .icon-pick button.active,
+.folder-inline-create .icon-pick button:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.folder-inline-create .icon-pick .folder-glyph {
+  width: 12px;
+  height: 12px;
+}
+.folder-inline-create input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  outline: none;
+}
+.folder-inline-create input:focus {
+  border-bottom-color: var(--accent);
+}
+.folder-inline-create .text-link {
+  flex: 0 0 auto;
 }
