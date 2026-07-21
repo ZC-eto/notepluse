@@ -332,8 +332,36 @@ function onSourceKeydown(e: KeyboardEvent) {
   handleEditorKeydown(e)
 }
 
+/**
+ * 排版模式换行策略（与 marked breaks:true 对齐）：
+ * - Enter → 软换行 <br> → Markdown 单 \n
+ * - Shift+Enter → 新段落
+ * - 列表项内保留浏览器默认（新 li）
+ * - 任务标题内吞掉 Enter，避免拆坏 task-item
+ */
+function handleWysiwygEnter(e: KeyboardEvent): boolean {
+  if (e.key !== 'Enter' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return false
+  const target = e.target as HTMLElement | null
+  if (target?.closest?.('.task-title, .task-item, .task-list, .task-block-boundary')) {
+    e.preventDefault()
+    return true
+  }
+  if (target?.closest?.('li')) return false
+
+  e.preventDefault()
+  if (e.shiftKey) {
+    document.execCommand('insertParagraph')
+  } else {
+    document.execCommand('insertLineBreak')
+  }
+  commitWysiwyg()
+  return true
+}
+
 function onWysiwygKeydown(e: KeyboardEvent) {
   handleEditorKeydown(e)
+  if (e.defaultPrevented) return
+  handleWysiwygEnter(e)
 }
 
 watch(

@@ -24,8 +24,10 @@ const rows: Row[] = [
   { group: '编辑', keys: 'Ctrl+Shift+8 / 9', action: '无序列表 / 有序列表' },
   { group: '编辑', keys: 'Ctrl+Shift+.', action: '引用' },
   { group: '编辑', keys: 'Ctrl+Alt+1…6', action: '标题 H1–H6（避开视图切换）' },
-  { group: '编辑', keys: 'Ctrl+Alt+T', action: '插入任务组' },
-  { group: '编辑', keys: 'Ctrl+Shift+M', action: '排版 ⇄ 源码' },
+  { group: '编辑', keys: 'Ctrl+Alt+T', action: '插入任务组（编辑中也可用）' },
+  { group: '编辑', keys: 'Ctrl+Shift+M', action: '排版 ⇄ 源码（编辑中也可用）' },
+  { group: '编辑', keys: 'Ctrl+Enter / Ctrl+Shift+T', action: '切换当前行任务勾选' },
+  { group: '编辑', keys: 'Enter（排版）', action: '软换行（单行）；Shift+Enter 新段落' },
   { group: '编辑', keys: 'Ctrl+Z / Y', action: '撤销 / 重做' },
   { group: '编辑', keys: 'Tab / Shift+Tab', action: '缩进列表或循环标题级别' },
 ]

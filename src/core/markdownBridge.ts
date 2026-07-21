@@ -8,7 +8,8 @@ import { parseTaskDocument } from './parseTasks'
  * 任务行用 data-* 保留元数据，降低往返丢失。
  */
 
-marked.setOptions({ gfm: true, breaks: false })
+// breaks: true → 单换行渲染为 <br>，避免段落内软换行在 Turndown 往返时被吃成空格
+marked.setOptions({ gfm: true, breaks: true })
 
 /** 工具条历史动作（兼容） */
 export type ToolbarAction = 'h1' | 'h2' | 'bold' | 'italic' | 'list' | 'task' | 'link' | 'date' | 'code' | 'codeBlock' | 'quote' | 'ol' | 'strikethrough'
@@ -640,6 +641,9 @@ export function editableHtmlToMarkdown(root: HTMLElement): string {
     headingStyle: 'atx',
     codeBlockStyle: 'fenced',
     bulletListMarker: '-',
+    // 与 applySourceFormat 的 *斜体* 一致，避免往返变成 _
+    emDelimiter: '*',
+    strongDelimiter: '**',
   })
 
   turndown.addRule('taskBlock', {
@@ -652,6 +656,12 @@ export function editableHtmlToMarkdown(root: HTMLElement): string {
     filter: (node) =>
       node.nodeName === 'DIV' && Boolean((node as HTMLElement).getAttribute('data-mdw-task-boundary')),
     replacement: (_content, node) => '\n' + ((node as HTMLElement).getAttribute('data-mdw-source') || '') + '\n\n',
+  })
+
+  // 软换行：<br> → 单 \n（与 marked breaks:true 对齐；行尾两空格硬换行也归一成软换行）
+  turndown.addRule('softLineBreak', {
+    filter: 'br',
+    replacement: () => '\n',
   })
 
   // 保留 <u> 下划线
@@ -670,7 +680,14 @@ export function editableHtmlToMarkdown(root: HTMLElement): string {
   if (!raw) return ''
 
   const md = turndown.turndown(clone.innerHTML)
-  const normalized = md.replace(/\n{3,}/g, '\n\n').replace(/[ \t]+\n/g, '\n').trim()
+  const normalized = md
+    // 多余空段
+    .replace(/\n{3,}/g, '\n\n')
+    // 行尾空白（含历史 hard-break 两空格）
+    .replace(/[ \t]+\n/g, '\n')
+    // turndown 列表常产出 "-   item"，收成 "- item"
+    .replace(/^(\s*[-*+]|\s*\d+\.)\s{2,}/gm, '$1 ')
+    .trim()
   return normalized ? normalized + '\n' : ''
 }
 

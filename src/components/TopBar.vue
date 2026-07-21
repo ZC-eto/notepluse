@@ -66,7 +66,7 @@ const showSaveChrome = computed(
 )
 
 const modeHelp =
-  '排版：所见即所得编辑；源码：直接编辑 Markdown。Ctrl+/ 可切换模式。左侧可切换视图；点「笔记库」浏览全部笔记。Ctrl+N 新建，Ctrl+P 搜索。'
+  '排版：所见即所得编辑；源码：直接编辑 Markdown。Ctrl+Shift+M 切换排版/源码；Ctrl+/ 打开快捷键表。左侧可切换视图；点「笔记库」浏览全部笔记。Ctrl+N 新建，Ctrl+P 搜索。'
 
 function onRetrySave() {
   if (typeof ws.retrySave === 'function') void ws.retrySave()

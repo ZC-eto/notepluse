@@ -310,3 +310,72 @@ describe('markdown preview sanitizer', () => {
     assert.match(html, /危险链接/)
   })
 })
+
+describe('soft line-break fidelity', () => {
+  it('renders single newlines as <br> (breaks:true)', () => {
+    const html = markdownToEditableHtml('line1\nline2\n')
+    assert.match(html, /line1\s*<br\s*\/?>\s*line2/i)
+  })
+
+  it('keeps paragraph breaks as separate blocks', () => {
+    const html = markdownToEditableHtml('line1\n\nline2\n')
+    assert.match(html, /<p>line1<\/p>/i)
+    assert.match(html, /<p>line2<\/p>/i)
+  })
+
+  it('renders multi soft-breaks inside one paragraph', () => {
+    const html = markdownToEditableHtml('a\nb\nc\n')
+    assert.match(html, /a\s*<br\s*\/?>\s*b\s*<br\s*\/?>\s*c/i)
+  })
+
+  it('renders Chinese soft breaks without collapsing', () => {
+    const html = markdownToEditableHtml('第一行\n第二行\n\n第三段\n')
+    assert.match(html, /第一行\s*<br\s*\/?>\s*第二行/i)
+    assert.match(html, /第三段/)
+  })
+
+  it('hard-break trailing spaces also become <br>', () => {
+    const html = markdownToEditableHtml('hello  \nworld\n')
+    assert.match(html, /hello\s*<br\s*\/?>\s*world/i)
+  })
+
+  it('round-trips soft newlines via turndown-compatible HTML string', async () => {
+    // 不依赖 jsdom：用 marked + 与生产一致的 turndown 规则做纯函数往返
+    const { marked } = await import('marked')
+    const TurndownService = (await import('turndown')).default
+    marked.setOptions({ gfm: true, breaks: true })
+    const turndown = new TurndownService({
+      headingStyle: 'atx',
+      codeBlockStyle: 'fenced',
+      bulletListMarker: '-',
+      emDelimiter: '*',
+      strongDelimiter: '**',
+    })
+    turndown.addRule('softLineBreak', {
+      filter: 'br',
+      replacement: () => '\n',
+    })
+    const normalize = (md: string) =>
+      md
+        .replace(/\n{3,}/g, '\n\n')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/^(\s*[-*+]|\s*\d+\.)\s{2,}/gm, '$1 ')
+        .trim() + '\n'
+
+    const samples = [
+      'line1\nline2\n',
+      'line1\n\nline2\n',
+      'hello  \nworld\n',
+      'a\nb\nc\n',
+      '第一行\n第二行\n\n第三段\n',
+      '**粗** 与 *斜*\n下一行\n',
+    ]
+    for (const md of samples) {
+      const html = marked.parse(md, { async: false }) as string
+      const back = normalize(turndown.turndown(html))
+      // 行尾两空格硬换行归一为软换行
+      const expectMd = md.replace(/[ \t]+\n/g, '\n')
+      assert.equal(back, expectMd, `round-trip failed for ${JSON.stringify(md)} → ${JSON.stringify(back)}`)
+    }
+  })
+})

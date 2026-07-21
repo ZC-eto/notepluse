@@ -263,12 +263,13 @@ function onKeydown(ev: KeyboardEvent) {
     shortcutsOpen.value = true
     return
   }
-  if (key === 'm' && ev.shiftKey && !ev.altKey && !isTextEntry) {
+  // 切模式 / 插任务组：编辑焦点内也要可用（源码 textarea、排版 contenteditable）
+  if (key === 'm' && ev.shiftKey && !ev.altKey) {
     ev.preventDefault()
     toggleEditorModeFromShortcut()
     return
   }
-  if (key === 't' && ev.altKey && !ev.shiftKey && !isTextEntry) {
+  if (key === 't' && ev.altKey && !ev.shiftKey) {
     ev.preventDefault()
     void insertTaskBlockFromShortcut()
     return
