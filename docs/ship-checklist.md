@@ -1,9 +1,11 @@
-# 上线验收清单（v0.3）
+# 上线验收清单（v0.8+）
 
 ## 安装
-- [ ] zip 根目录含 plugin.json
+- [ ] zip 根目录含 plugin.json（无 development / $schema）
 - [ ] 命令 md / 笔记 / todo / gantt / 日历 可打开
-- [ ] 插件高度正常
+- [ ] 拖入 .md 文件可走 open-file feature
+- [ ] 插件高度正常（setExpendHeight ~760；允许用户拖拽）
+- [ ] 版本号与 package.json / 设置页一致
 
 ## 笔记
 - [ ] 目录可见可换、打开文件夹

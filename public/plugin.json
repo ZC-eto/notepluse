@@ -1,13 +1,16 @@
 {
-  "$schema": "node_modules/@ztools-center/ztools-api-types/resource/ztools.schema.json",
+  "$schema": "../node_modules/@ztools-center/ztools-api-types/resource/ztools.schema.json",
   "name": "md-workspace",
   "title": "Markdown 工作台",
   "description": "本地 Markdown 工作台：文件夹·全局待办·甘特/日历·设置与撤销",
   "author": "ZTools Plugin",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "main": "index.html",
   "preload": "preload/services.js",
   "logo": "logo.png",
+  "pluginSetting": {
+    "single": true
+  },
   "features": [
     {
       "code": "workspace",

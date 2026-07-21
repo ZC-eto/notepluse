@@ -156,11 +156,14 @@ function handleEnter(action: any) {
   if (code === 'todo') selectView('todo')
   else if (code === 'gantt') selectView('gantt')
   else if (code === 'calendar') selectView('calendar')
-  else selectView('editor')
-
-  if (code === 'open-file') {
+  else if (code === 'open-file') {
+    selectView('editor')
     const p = extractFilePath(action)
     if (p) void ws.openNote(p)
+  } else {
+    // workspace / 默认入口：尊重设置里的默认视图，不写死笔记
+    const preferred = ((ws as any).defaultView as AppView | undefined) || 'editor'
+    selectView(preferred)
   }
 }
 

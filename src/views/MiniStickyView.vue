@@ -86,17 +86,9 @@ function onToggle(task: GlobalTask) {
 }
 
 function closeWindow() {
+  // 小窗是 createBrowserWindow 子窗，不是主插件进程；只关当前窗，勿 outPlugin
   try {
     if (typeof window.close === 'function') window.close()
-  } catch {
-    /* ignore */
-  }
-  try {
-    // 宿主子窗有 close
-    const anyWin = window as any
-    if (typeof anyWin.ztools?.outPlugin === 'function') {
-      /* 小窗不是主插件，忽略 */
-    }
   } catch {
     /* ignore */
   }

@@ -1,12 +1,13 @@
 {
   "name": "md-workspace",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "description": "Markdown 工作台：本地笔记 + 显式待办语法驱动的待办/甘特投影",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:any": "vite --port 0 --strictPort false",
     "build": "vue-tsc --noEmit && vite build --config vite.ship.config.js",
-    "preview": "vite preview",
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
     "test:core": "node --import tsx --test src/core/task.test.ts src/core/markdownBridge.test.ts src/core/globalTasks.test.ts",
     "pack": "npm run build && node scripts/pack.mjs",
     "pack:only": "node scripts/pack.mjs"

@@ -35,19 +35,36 @@ Layer 3  投影视图
 ## 本地开发
 
 ```bash
-pnpm install   # 或 npm install
-pnpm dev
+npm install
+npm run dev          # 固定 http://127.0.0.1:5173（与 plugin.json development.main 对齐）
+npm run dev:any      # 端口被占用时自动换端口（仅浏览器预览，宿主开发勿用）
+npm run test:core
 ```
 
-在 ZTools 中加载本插件（开发模式会读 `plugin.json` 的 `development.main`）。
+### 在 ZTools 宿主中调试（推荐）
+
+1. `npm run dev`，保证 **5173 空闲**（`vite` 配置了 `strictPort: true`，被占用会直接失败）。
+2. ZTools 以开发模式加载本插件目录（或指向含 `plugin.json` 的构建输出）。
+3. 宿主会读 `plugin.json` 的 `development.main`：`http://localhost:5173`，并注入 preload 与 `window.ztools`。
+
+纯浏览器打开 Vite 地址**没有**宿主 API（读写笔记目录、小窗、`onPluginEnter` 等会降级或走 demo），只能看 UI，不能代替真机。
+
+### 安装包
+
+```bash
+npm run pack
+# → release/md-workspace-vX.Y.Z.zip（zip 根含 plugin.json）
+```
+
+ZTools：设置 → 插件 → 导入本地插件 → 选 zip。
 
 ## 构建
 
 ```bash
-pnpm build
+npm run build
 ```
 
-产物在 `dist/`，可安装到 ZTools 或 `ztools publish`。
+产物在 `dist/`。发版请用 `npm run pack`（会剥离 `development` / `$schema` 并打 zip）。
 
 ## 文件夹（v0.4）
 

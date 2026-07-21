@@ -565,7 +565,6 @@ export function useWorkspace() {
           hasShadow: false,
           backgroundColor: '#00000000',
           skipTaskbar: true,
-          alwayOnTop: true,
           alwaysOnTop: true,
           webPreferences: {
             zoomFactor: 1,
