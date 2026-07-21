@@ -123,7 +123,8 @@ function onRailDblClick(view: AppView, ev: MouseEvent) {
     return
   }
   selectView('editor')
-  libraryOpen.value = true
+  // 再双击：已开则关，已关则开
+  libraryOpen.value = !libraryOpen.value
 }
 
 const railCtx = ref<{ x: number; y: number } | null>(null)

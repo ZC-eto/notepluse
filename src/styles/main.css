@@ -5321,3 +5321,204 @@ html[data-density='compact'] .md-body .task-block-boundary {
 .rail-nav-item.is-editor {
   /* hint: 右键可新建 */
 }
+
+/* ========================================================================== */
+/* ui/quiet-shell — denser chrome, flyout more, library sort/ctx, todo buckets */
+/* ========================================================================== */
+
+:root {
+  --topbar: 42px;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --sidebar: 260px;
+}
+
+/* Help tip: smaller, less visual weight */
+.help-tip {
+  width: 14px !important;
+  height: 14px !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  opacity: 0.55;
+}
+.help-tip:hover,
+.help-tip.open,
+.help-tip:focus-visible {
+  opacity: 1;
+  background: var(--surface-2) !important;
+  border-color: var(--line) !important;
+}
+.help-tip-icon {
+  font-size: 10px !important;
+  font-weight: 600 !important;
+}
+
+/* Editor toolbar: single row, no wrap; more as right flyout */
+.editor-toolbar {
+  flex-wrap: nowrap !important;
+  overflow: hidden;
+  min-height: 34px;
+  padding: 4px 10px !important;
+}
+.editor-toolbar.is-more {
+  display: none !important;
+}
+.editor-more-wrap {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+}
+.editor-more-flyout {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 6px;
+  z-index: 30;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 2px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+}
+.editor-more-trigger[aria-expanded="true"] {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+
+/* Library sort chips */
+.sidebar-sort {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px 8px;
+}
+.sort-chip {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  min-height: 22px;
+}
+.sort-chip:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+.sort-chip.active {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.sort-dir {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font-size: 12px;
+  min-width: 22px;
+  min-height: 22px;
+  border-radius: 4px;
+}
+.sort-dir:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+/* Library context menu */
+.lib-ctx-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: transparent;
+}
+.lib-ctx-menu button.is-danger {
+  color: var(--warning);
+}
+
+/* Sidebar quieter brand */
+.sidebar-top .brand-mark {
+  display: none;
+}
+.sidebar-top {
+  padding: 10px 10px 6px !important;
+}
+.brand-name {
+  font-size: 12px !important;
+  font-weight: 650 !important;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  text-transform: none;
+}
+.brand-sub {
+  font-size: 11px !important;
+}
+
+/* Todo groups */
+.todo-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0 16px;
+}
+.todo-group-label {
+  margin: 8px 12px 4px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+  text-transform: none;
+}
+.todo-chip.is-goal {
+  color: var(--task-violet);
+  background: color-mix(in srgb, var(--task-violet) 16%, transparent);
+  border: 0;
+}
+.todo-row.is-goal .todo-workline {
+  background: var(--task-violet);
+  opacity: 0.85;
+}
+/* overdue: amber, not red */
+.todo-list .todo-row.overdue .todo-workline {
+  background: var(--warning) !important;
+}
+.sum-chip.warn {
+  background: var(--warning-soft);
+  color: var(--warning);
+  border: 0;
+}
+.todo-row.overdue .todo-title {
+  color: var(--ink);
+}
+
+/* Denser topbar / mode seg */
+.topbar {
+  min-height: var(--topbar);
+}
+.seg.editor-mode-seg .seg-btn {
+  min-height: 26px;
+  padding: 0 8px;
+  font-size: 11.5px;
+}
+.btn-ghost.sm,
+.view-toolbar .btn-ghost.sm {
+  min-height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+/* Main pane slightly tighter margin */
+.main-pane {
+  margin: 8px 8px 8px 0;
+  border-radius: 12px;
+}

@@ -1,5 +1,5 @@
-﻿<script setup lang="ts">
-import { computed, inject, ref } from 'vue'
+<script setup lang="ts">
+import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { useWorkspace } from '../composables/useWorkspace'
 import type { NoteMeta, SyncProvider } from '../core/types'
 
@@ -7,6 +7,18 @@ const ws = inject('workspace') as ReturnType<typeof useWorkspace>
 const q = ref('')
 const renamingPath = ref('')
 const renameDraft = ref('')
+
+/** 名称 | 修改时间；方向升/降 */
+type SortField = 'name' | 'mtime'
+type SortDir = 'asc' | 'desc'
+const sortField = ref<SortField>('name')
+const sortDir = ref<SortDir>('asc')
+
+type CtxMenu =
+  | { kind: 'blank'; x: number; y: number }
+  | { kind: 'note'; x: number; y: number; path: string; name: string }
+
+const ctx = ref<CtxMenu | null>(null)
 
 const filteredGroups = computed(() => {
   const key = q.value.trim().toLowerCase()
@@ -17,19 +29,51 @@ const filteredGroups = computed(() => {
     notes: NoteMeta[]
   }[]
 
-  if (!key) return groups
+  const sorted = groups.map((g) => ({
+    ...g,
+    notes: sortNotes(
+      key
+        ? g.notes.filter((n) => n.name.toLowerCase().includes(key))
+        : g.notes.slice()
+    ),
+  }))
 
-  return groups
-    .map((g) => ({
-      ...g,
-      notes: g.notes.filter((n) => n.name.toLowerCase().includes(key)),
-    }))
-    .filter((g) => g.notes.length > 0 || g.label.toLowerCase().includes(key))
+  if (!key) return sorted
+  return sorted.filter((g) => g.notes.length > 0 || g.label.toLowerCase().includes(key))
 })
 
 const totalVisible = computed(() =>
   filteredGroups.value.reduce((sum, g) => sum + g.notes.length, 0)
 )
+
+function sortNotes(notes: NoteMeta[]): NoteMeta[] {
+  const dir = sortDir.value === 'asc' ? 1 : -1
+  return notes.slice().sort((a, b) => {
+    if (sortField.value === 'mtime') {
+      const d = (a.mtime || 0) - (b.mtime || 0)
+      if (d) return d * dir
+      return a.name.localeCompare(b.name, 'zh-CN') * dir
+    }
+    const byName = a.name.localeCompare(b.name, 'zh-CN')
+    if (byName) return byName * dir
+    return ((a.mtime || 0) - (b.mtime || 0)) * dir
+  })
+}
+
+function setSortField(field: SortField) {
+  if (sortField.value === field) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortField.value = field
+    sortDir.value = field === 'mtime' ? 'desc' : 'asc'
+  }
+}
+
+function sortLabel(): string {
+  const f = sortField.value === 'name' ? '名称' : '时间'
+  const d = sortDir.value === 'asc' ? '升序' : '降序'
+  return `${f} · ${d}`
+}
 
 function titleOf(name: string) {
   return name.replace(/\.md$/i, '')
@@ -56,6 +100,7 @@ function kindBadge(kind: string) {
 }
 
 function startRename(path: string, name: string) {
+  closeCtx()
   renamingPath.value = path
   renameDraft.value = titleOf(name)
 }
@@ -83,6 +128,7 @@ function onOpenFolder() {
 }
 
 function onCreateInFolder(folder: string) {
+  closeCtx()
   ws.setActiveFolder(folder)
   void ws.createNote(folder)
 }
@@ -99,12 +145,18 @@ function onToggleGroup(folder: string) {
 }
 
 function onNewFolder() {
+  closeCtx()
   void ws.createFolder(undefined, ws.activeFolder || '')
 }
 
-function onSyncChange(ev: Event) {
-  const val = (ev.target as HTMLSelectElement).value as SyncProvider
-  void ws.setSyncProvider(val)
+function onNewNote() {
+  closeCtx()
+  void ws.createNote(ws.activeFolder || '')
+}
+
+function onDeleteNote(path: string) {
+  closeCtx()
+  void ws.removeNote(path)
 }
 
 function isCollapsed(folder: string) {
@@ -126,16 +178,55 @@ function displayFolderLabel(group: { folder: string; label: string }) {
   const parts = group.folder.split('/').filter(Boolean)
   return parts[parts.length - 1] || group.label
 }
+
+function openBlankCtx(ev: MouseEvent) {
+  const t = ev.target as HTMLElement | null
+  // 点在笔记行/按钮上时由行自己处理
+  if (t?.closest?.('.note-item, .folder-head, .sidebar-top, .sidebar-search, .sidebar-foot, button, input')) {
+    return
+  }
+  ev.preventDefault()
+  ctx.value = { kind: 'blank', x: ev.clientX, y: ev.clientY }
+}
+
+function openNoteCtx(ev: MouseEvent, path: string, name: string) {
+  ev.preventDefault()
+  ev.stopPropagation()
+  ctx.value = { kind: 'note', x: ev.clientX, y: ev.clientY, path, name }
+}
+
+function closeCtx() {
+  ctx.value = null
+}
+
+function onGlobalPointer(ev: MouseEvent) {
+  if (!ctx.value) return
+  const el = ev.target as HTMLElement | null
+  if (el?.closest?.('.lib-ctx-menu')) return
+  closeCtx()
+}
+
+function onGlobalKey(ev: KeyboardEvent) {
+  if (ev.key === 'Escape') closeCtx()
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onGlobalPointer, true)
+  document.addEventListener('keydown', onGlobalKey, true)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onGlobalPointer, true)
+  document.removeEventListener('keydown', onGlobalKey, true)
+})
 </script>
 
 <template>
-  <aside id="note-library" class="sidebar" aria-label="笔记库">
+  <aside id="note-library" class="sidebar" aria-label="笔记库" @contextmenu="openBlankCtx">
     <div class="sidebar-top">
       <div class="brand-row">
-        <span class="brand-mark" aria-hidden="true"><i /><i /><i /></span>
         <div class="brand-text">
           <div class="brand-name">笔记库</div>
-          <div class="brand-sub">{{ totalVisible }} 篇</div>
+          <div class="brand-sub">{{ totalVisible }}</div>
         </div>
       </div>
       <div class="sidebar-top-actions">
@@ -157,7 +248,31 @@ function displayFolderLabel(group: { folder: string; label: string }) {
     <div class="sidebar-search">
       <label class="sr-only" for="note-search">搜索笔记</label>
       <span class="search-glyph" aria-hidden="true" />
-      <input id="note-search" v-model="q" class="search-input" type="search" placeholder="搜索笔记" />
+      <input id="note-search" v-model="q" class="search-input" type="search" placeholder="搜索" />
+    </div>
+
+    <div class="sidebar-sort" role="group" aria-label="排序">
+      <button
+        type="button"
+        class="sort-chip"
+        :class="{ active: sortField === 'name' }"
+        :title="sortField === 'name' ? `名称${sortDir === 'asc' ? '升序' : '降序'}，再点切换方向` : '按名称排序'"
+        @click="setSortField('name')"
+      >名称</button>
+      <button
+        type="button"
+        class="sort-chip"
+        :class="{ active: sortField === 'mtime' }"
+        :title="sortField === 'mtime' ? `时间${sortDir === 'asc' ? '升序' : '降序'}，再点切换方向` : '按修改时间排序'"
+        @click="setSortField('mtime')"
+      >时间</button>
+      <button
+        type="button"
+        class="sort-dir"
+        :title="`当前 ${sortLabel()}，点击切换升/降序`"
+        :aria-label="`排序方向 ${sortDir === 'asc' ? '升序' : '降序'}`"
+        @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'"
+      >{{ sortDir === 'asc' ? '↑' : '↓' }}</button>
     </div>
 
     <div v-if="!ws.notes.length" class="onboard-card">
@@ -170,7 +285,7 @@ function displayFolderLabel(group: { folder: string; label: string }) {
     </div>
 
     <div v-if="!q.trim() && ws.recentNotes && ws.recentNotes.length" class="recent-block">
-      <div class="recent-head"><span>最近打开</span><span class="workline-mini" aria-hidden="true" /></div>
+      <div class="recent-head"><span>最近</span></div>
       <button
         v-for="note in ws.recentNotes"
         :key="'recent-' + note.path"
@@ -179,6 +294,7 @@ function displayFolderLabel(group: { folder: string; label: string }) {
         :class="{ active: note.path === ws.activePath }"
         :aria-current="note.path === ws.activePath ? 'page' : undefined"
         @click="ws.openNote(note.path)"
+        @contextmenu="openNoteCtx($event, note.path, note.name)"
       >
         <span class="note-dot" aria-hidden="true" />
         <span class="note-name">{{ titleOf(note.name) }}</span>
@@ -227,6 +343,7 @@ function displayFolderLabel(group: { folder: string; label: string }) {
             :key="note.path"
             class="note-item"
             :class="{ active: note.path === ws.activePath }"
+            @contextmenu="openNoteCtx($event, note.path, note.name)"
           >
             <div v-if="renamingPath === note.path" class="note-open">
               <span class="note-dot" aria-hidden="true" />
@@ -285,7 +402,30 @@ function displayFolderLabel(group: { folder: string; label: string }) {
         <button type="button" class="btn-ghost sm" @click="onOpenFolder">打开文件夹</button>
       </div>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="ctx"
+        class="lib-ctx-layer"
+        @contextmenu.prevent="closeCtx"
+      >
+        <div
+          class="lib-ctx-menu rail-ctx-menu"
+          role="menu"
+          :style="{ left: ctx.x + 'px', top: ctx.y + 'px' }"
+          @click.stop
+        >
+          <template v-if="ctx.kind === 'blank'">
+            <button type="button" role="menuitem" @click="onNewNote">新建笔记</button>
+            <button type="button" role="menuitem" @click="onNewFolder">新建文件夹</button>
+          </template>
+          <template v-else>
+            <button type="button" role="menuitem" @click="ws.openNote(ctx.path); closeCtx()">打开</button>
+            <button type="button" role="menuitem" @click="startRename(ctx.path, ctx.name)">重命名</button>
+            <button type="button" role="menuitem" class="is-danger" @click="onDeleteNote(ctx.path)">删除</button>
+          </template>
+        </div>
+      </div>
+    </Teleport>
   </aside>
 </template>
-
-

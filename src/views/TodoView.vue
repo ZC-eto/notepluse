@@ -11,12 +11,12 @@ import { globalTaskKey } from '../core/globalTasks'
 
 const ws = inject('workspace') as ReturnType<typeof useWorkspace>
 
-type TodoScope = 'inbox' | 'today' | 'upcoming' | 'all'
-type CompletionFilter = 'all' | 'open' | 'done'
+type TodoScope = 'open' | 'done'
 type DraftScheduleKind = 'none' | 'date' | 'due' | 'range'
+type NatureFilter = 'all' | 'task' | 'goal'
 
-const scope = ref<TodoScope>('today')
-const filter = ref<CompletionFilter>('open')
+const scope = ref<TodoScope>('open')
+const natureFilter = ref<NatureFilter>('all')
 const tagFilter = ref<string | null>(null)
 const priorityFilter = ref<TaskPriority | null>(null)
 const blockFilter = ref<string | null>(null)
@@ -61,68 +61,82 @@ const isDraftScheduleValid = computed(() => {
 const canAddDraft = computed(() => !!draft.value.trim() && hasWritableTarget.value && isDraftScheduleValid.value)
 
 const scopeHelpText = computed(() => {
-  if (scope.value === 'inbox') return '收件箱只显示无完整日期语义的未完成任务；它们不会被当作“今天”。'
-  if (scope.value === 'today') return '今日显示单日、进行中区间，以及今天到期或已逾期的截止项；截止日不会被当作执行结束日。'
-  if (scope.value === 'upcoming') return '即将到来显示未来 14 天的单日、开始或截止承诺。'
-  return '全部只汇总任务组中的事项；普通勾选清单不会出现在这里。'
+  if (scope.value === 'open') {
+    return '未完成任务。列表内按「今天 / 已排期 / 未排期」分组。带 #目标 的为长期目标，其余为事项。'
+  }
+  return '已完成的任务。可在筛选中按标签或任务组收窄。'
 })
 
 const emptyTitle = computed(() => {
-  if (scope.value === 'inbox') return '收件箱为空'
-  if (scope.value === 'today') return '今日暂无待办'
-  if (scope.value === 'upcoming') return '未来 14 天暂无待办'
-  return '尚未声明可管理任务'
+  if (scope.value === 'open') return '暂无未完成事项'
+  return '暂无已完成事项'
 })
 
 const emptyHelpText = computed(() =>
   taskBlockTargets.value.length
-    ? '选择目标笔记与任务组后即可新建任务。普通勾选清单不会自动进待办。'
-    : '当前没有可投影的任务组。可一键填充示例，或在源码中插入 <!-- mdw:tasks --> 任务块。普通勾选清单不会自动进待办。'
+    ? '选择目标笔记与任务组后即可新建。只有任务组内的显式任务会出现在此。'
+    : '还没有可投影的任务组。可在源码插入 <!-- mdw:tasks --> 任务块，或填充示例。'
 )
 
 const taskBlockHowToText =
-  '在 Markdown 源码中用 HTML 注释包裹任务清单，例如：<!-- mdw:tasks id="daily" name="今日" color="blue" --> … - [ ] 事项 @date(2026-07-20) … <!-- /mdw:tasks -->。只有块内的显式任务会进入待办 / 日历 / 甘特。'
+  '在 Markdown 源码中用注释包裹任务清单，例如：<!-- mdw:tasks id="daily" name="今日" --> … - [ ] 事项 @date(2026-07-20) … <!-- /mdw:tasks -->。只有块内任务会进入待办 / 日历 / 甘特。长期目标可加标签 #目标。'
 
 const composerHelpText = computed(() => {
   if (!taskBlockTargets.value.length) {
-    return '没有可写的任务组。请在源码中创建合法的任务组后再返回这里。'
+    return '没有可写的任务组。请在源码中创建合法任务组后再返回。'
   }
   if (!hasWritableTarget.value) {
-    return '请选择要写入的笔记和任务组；不会自动创建计划文档或追加到文末。'
+    return '请选择要写入的笔记和任务组。'
   }
-  return '任务会写入左侧所选笔记与任务组。可用下方选项设置排期语义（@date / @due / @start+@end）、类型与优先级。'
+  return '任务写入所选笔记与任务组。可用选项设置排期（@date / @due / @start+@end）、类型与优先级。长期目标请加标签 #目标。'
 })
 
 const scopeOptions = computed(() => [
-  { id: 'inbox', label: '收件箱', title: '未排期的未完成任务，不等于今天必须处理', count: inboxTasks.value.length || undefined },
-  { id: 'today', label: '今日', title: '今天的单日、进行中区间，以及今天到期/已逾期的截止项', count: todayTasks.value.length || undefined },
-  { id: 'upcoming', label: '即将到来', title: '未来 14 天内的单日、开始或截止承诺', count: upcomingTasks.value.length || undefined },
-  { id: 'all', label: '全部', title: '所有有效任务组内的任务', count: globalTasks.value.length || undefined },
+  { id: 'open', label: '未完成', title: '未勾选的任务', count: openTasks.value.length || undefined },
+  { id: 'done', label: '已完成', title: '已勾选的任务', count: doneTasks.value.length || undefined },
 ])
 
-const inboxTasks = computed(() => globalTasks.value.filter((task) => !task.done && !hasSchedule(task)))
+const openTasks = computed(() => globalTasks.value.filter((task) => !task.done))
+const doneTasks = computed(() => globalTasks.value.filter((task) => task.done))
 const todayTasks = computed(() => globalTasks.value.filter((task) => isTodayFocus(task, today.value)))
-const upcomingTasks = computed(() => globalTasks.value.filter((task) => isUpcoming(task, today.value)))
 
 const scopedTasks = computed<GlobalTask[]>(() => {
-  if (scope.value === 'inbox') return inboxTasks.value
-  if (scope.value === 'today') return todayTasks.value
-  if (scope.value === 'upcoming') return upcomingTasks.value
-  return globalTasks.value
+  if (scope.value === 'done') return doneTasks.value
+  return openTasks.value
 })
+
+/** 列表内时间分组（仅未完成主视图使用） */
+type TimeBucket = 'today' | 'scheduled' | 'unscheduled'
+
+function timeBucket(task: GlobalTask): TimeBucket {
+  if (isTodayFocus(task, today.value)) return 'today'
+  if (hasSchedule(task)) return 'scheduled'
+  return 'unscheduled'
+}
+
+function isGoalTask(task: GlobalTask): boolean {
+  if (task.tags.some((t) => /^(目标|goal|长期)$/i.test(t))) return true
+  return false
+}
 
 const stats = computed(() => ({
   total: scopedTasks.value.length,
-  done: scopedTasks.value.filter((task) => task.done).length,
+  done: scope.value === 'done' ? scopedTasks.value.length : 0,
+  open: scope.value === 'open' ? scopedTasks.value.length : openTasks.value.length,
 }))
 
-const progress = computed(() => stats.value.total ? Math.round((stats.value.done / stats.value.total) * 100) : 0)
+const progress = computed(() => {
+  const all = globalTasks.value.length
+  if (!all) return 0
+  return Math.round((doneTasks.value.length / all) * 100)
+})
 
 const todaySummary = computed(() => {
   let overdue = 0
   let active = 0
   let dueToday = 0
   for (const task of todayTasks.value) {
+    if (task.done) continue
     if (task.due && task.due < today.value) overdue++
     else if (task.due === today.value) dueToday++
     else active++
@@ -142,12 +156,33 @@ const allBlocks = computed(() => {
 
 const list = computed(() => {
   let result = scopedTasks.value.slice()
-  if (filter.value === 'open') result = result.filter((task) => !task.done)
-  if (filter.value === 'done') result = result.filter((task) => task.done)
+  if (natureFilter.value === 'goal') result = result.filter((task) => isGoalTask(task))
+  if (natureFilter.value === 'task') result = result.filter((task) => !isGoalTask(task))
   if (tagFilter.value) result = result.filter((task) => task.tags.includes(tagFilter.value!))
   if (priorityFilter.value) result = result.filter((task) => task.priority === priorityFilter.value)
   if (blockFilter.value) result = result.filter((task) => blockKey(task) === blockFilter.value)
-  return result.sort(scope.value === 'all' ? sortAllTasks : sortTasks)
+  return result.sort(sortTasks)
+})
+
+/** 分组后的列表（未完成时按时间桶） */
+const groupedList = computed(() => {
+  if (scope.value === 'done') {
+    return [{ id: 'done' as const, label: '已完成', items: list.value }]
+  }
+  const today: GlobalTask[] = []
+  const scheduled: GlobalTask[] = []
+  const unscheduled: GlobalTask[] = []
+  for (const task of list.value) {
+    const b = timeBucket(task)
+    if (b === 'today') today.push(task)
+    else if (b === 'scheduled') scheduled.push(task)
+    else unscheduled.push(task)
+  }
+  const groups: { id: string; label: string; items: GlobalTask[] }[] = []
+  if (today.length) groups.push({ id: 'today', label: '今天', items: today })
+  if (scheduled.length) groups.push({ id: 'scheduled', label: '已排期', items: scheduled })
+  if (unscheduled.length) groups.push({ id: 'unscheduled', label: '未排期', items: unscheduled })
+  return groups
 })
 
 const emptyKind = computed(() => {
@@ -162,7 +197,6 @@ watch(scope, () => {
 
 watch(taskBlockTargets, (targets) => {
   if (selectedTargetKey.value && targets.some((target) => targetKey(target) === selectedTargetKey.value)) return
-  // 不自动选中目标：新任务的写入位置必须由用户明确决定。
   selectedTargetKey.value = ''
 }, { immediate: true })
 
@@ -242,15 +276,7 @@ function isScheduleLag(task: Task): boolean {
   return !task.done && !!task.start && !!task.end && task.start <= task.end && task.end < today.value
 }
 
-/** 全部视图保留文档 → Task Block → 源码树顺序，避免把子任务与父上下文打散。 */
-function sortAllTasks(a: GlobalTask, b: GlobalTask): number {
-  const source = sourceLabel(a).localeCompare(sourceLabel(b), 'zh-CN')
-  if (source) return source
-  const block = blockLabel(a).localeCompare(blockLabel(b), 'zh-CN')
-  if (block) return block
-  return a.lineIndex - b.lineIndex
-}
-
+/** 文档顺序仅在需要时使用；默认按时间与优先级。 */
 function sortTasks(a: GlobalTask, b: GlobalTask): number {
   const aDueOverdue = isDueOverdue(a) ? 0 : 1
   const bDueOverdue = isDueOverdue(b) ? 0 : 1
@@ -266,23 +292,6 @@ function sortTasks(a: GlobalTask, b: GlobalTask): number {
   if (source) return source
   if (a.depth !== b.depth) return a.depth - b.depth
   return a.lineIndex - b.lineIndex
-}
-
-function isUpcoming(task: Task, localToday: string): boolean {
-  if (task.done) return false
-  const upperBound = addLocalDays(localToday, 14)
-  const dates = [task.date, task.due]
-  if (task.start && task.end && task.start <= task.end) dates.push(task.start)
-  return dates.some((date) => !!date && date > localToday && date <= upperBound)
-}
-
-function addLocalDays(value: string, days: number): string {
-  const [year, month, day] = value.split('-').map(Number)
-  const date = new Date(year, month - 1, day + days)
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
 }
 
 function taskTiming(task: Task): string {
@@ -306,7 +315,7 @@ function toggleExpand(task: GlobalTask) {
 }
 
 function clearFilters() {
-  filter.value = 'open'
+  natureFilter.value = 'all'
   tagFilter.value = null
   priorityFilter.value = null
   blockFilter.value = null
@@ -317,11 +326,12 @@ function toggleTag(tag: string) {
 }
 
 const filtersActive = computed(
-  () => Boolean(tagFilter.value || priorityFilter.value || blockFilter.value)
+  () => Boolean(natureFilter.value !== 'all' || tagFilter.value || priorityFilter.value || blockFilter.value)
 )
 const showFilterPanel = computed(() => filtersOpen.value || filtersActive.value)
 const activeFilterCount = computed(() => {
   let n = 0
+  if (natureFilter.value !== 'all') n += 1
   if (tagFilter.value) n += 1
   if (priorityFilter.value) n += 1
   if (blockFilter.value) n += 1
@@ -455,16 +465,10 @@ async function openSource(task: GlobalTask) {
     <header class="view-toolbar" aria-label="待办工具栏">
       <div class="view-toolbar-primary">
         <div class="view-toolbar-cluster todo-scope-cluster">
-          <ScopeSeg v-model="scope" :options="scopeOptions" aria-label="待办范围" />
-          <HelpTip :text="scopeHelpText" label="当前范围说明" placement="left" />
-          <div class="filter-seg" role="group" aria-label="完成状态筛选">
-            <button type="button" class="seg-btn" :class="{ active: filter === 'open' }" @click="filter = 'open'">未完成</button>
-            <button type="button" class="seg-btn" :class="{ active: filter === 'done' }" @click="filter = 'done'">已完成</button>
-            <button type="button" class="seg-btn" :class="{ active: filter === 'all' }" @click="filter = 'all'">全部</button>
-          </div>
-          <span class="todo-progress-mini" :aria-label="`当前范围完成 ${stats.done}/${stats.total}`">{{ stats.done }}/{{ stats.total }}</span>
+          <ScopeSeg v-model="scope" :options="scopeOptions" aria-label="完成状态" />
+          <HelpTip :text="scopeHelpText" label="待办说明" placement="left" />
+          <span class="todo-progress-mini" :aria-label="`完成进度 ${progress}%`">{{ doneTasks.length }}/{{ globalTasks.length }}</span>
           <button
-            v-if="allTags.length || allBlocks.length"
             type="button"
             class="btn-ghost sm"
             :class="{ active: showFilterPanel }"
@@ -485,11 +489,11 @@ async function openSource(task: GlobalTask) {
       </div>
 
       <div
-        v-if="scope === 'today' && todaySummary.overdue"
+        v-if="scope === 'open' && todaySummary.overdue"
         class="today-summary is-compact"
-        aria-label="今日任务摘要"
+        aria-label="今日摘要"
       >
-        <span class="sum-chip danger">截止逾期 {{ todaySummary.overdue }}</span>
+        <span class="sum-chip warn">逾期 {{ todaySummary.overdue }}</span>
         <span v-if="todaySummary.dueToday" class="sum-chip">今日截止 {{ todaySummary.dueToday }}</span>
       </div>
 
@@ -533,7 +537,7 @@ async function openSource(task: GlobalTask) {
             aria-label="任务日期语义"
             title="未排期（收件箱） / 单日安排 @date / 截止日期 @due / 执行区间 @start + @end"
           >
-            <option value="none">未排期（收件箱）</option>
+            <option value="none">未排期</option>
             <option value="date">单日安排 @date</option>
             <option value="due">截止日期 @due</option>
             <option value="range">执行区间 @start + @end</option>
@@ -545,7 +549,7 @@ async function openSource(task: GlobalTask) {
             <input v-model="draftEnd" class="date-input" type="date" aria-label="执行结束日期" />
           </template>
           <select v-model="draftType" class="date-input" aria-label="任务类型">
-            <option value="task">任务</option>
+            <option value="task">事项</option>
             <option value="group">分组</option>
             <option value="milestone">里程碑</option>
           </select>
@@ -563,12 +567,15 @@ async function openSource(task: GlobalTask) {
     </header>
 
     <div
-      v-if="showFilterPanel && (allTags.length || allBlocks.length)"
+      v-if="showFilterPanel"
       id="todo-filter-panel"
       class="tag-filter"
       aria-label="任务属性筛选"
     >
       <button type="button" class="tag-chip" :class="{ active: !filtersActive }" @click="clearFilters">清除</button>
+      <button type="button" class="tag-chip" :class="{ active: natureFilter === 'all' }" @click="natureFilter = 'all'">全部性质</button>
+      <button type="button" class="tag-chip" :class="{ active: natureFilter === 'task' }" @click="natureFilter = 'task'">事项</button>
+      <button type="button" class="tag-chip" :class="{ active: natureFilter === 'goal' }" @click="natureFilter = 'goal'">目标</button>
       <button v-for="tag in allTags" :key="tag" type="button" class="tag-chip" :class="{ active: tagFilter === tag }" @click="toggleTag(tag)">#{{ tag }}</button>
       <select v-model="priorityFilter" class="date-input" aria-label="按优先级筛选">
         <option :value="null">所有优先级</option>
@@ -636,7 +643,7 @@ async function openSource(task: GlobalTask) {
             aria-label="任务日期语义"
             title="未排期（收件箱） / 单日安排 @date / 截止日期 @due / 执行区间 @start + @end"
           >
-            <option value="none">未排期（收件箱）</option>
+            <option value="none">未排期</option>
             <option value="date">单日安排 @date</option>
             <option value="due">截止日期 @due</option>
             <option value="range">执行区间 @start + @end</option>
@@ -648,7 +655,7 @@ async function openSource(task: GlobalTask) {
             <input v-model="draftEnd" class="date-input" type="date" aria-label="执行结束日期" />
           </template>
           <select v-model="draftType" class="date-input" aria-label="任务类型">
-            <option value="task">任务</option>
+            <option value="task">事项</option>
             <option value="group">分组</option>
             <option value="milestone">里程碑</option>
           </select>
@@ -673,78 +680,89 @@ async function openSource(task: GlobalTask) {
       <button type="button" class="btn-ghost" @click="clearFilters">清除筛选</button>
     </div>
 
-    <ul v-else class="todo-list" aria-label="任务列表">
-      <li
-        v-for="task in list"
-        :key="rowKey(task)"
-        class="todo-row"
-        :class="{
-          done: task.done,
-          overdue: isDueOverdue(task),
-          global: true,
-          open: isExpanded(task),
-          'todo-readonly': !task.isWritable,
-          'todo-schedule-lag': isScheduleLag(task),
-        }"
-        :style="{ '--task-depth': task.depth, '--task-color': task.color || 'var(--accent)' }"
+    <div v-else class="todo-list-wrap" aria-label="任务列表">
+      <section
+        v-for="group in groupedList"
+        :key="group.id"
+        class="todo-group"
       >
-        <div
-          class="todo-row-main"
-          :style="{
-            paddingInlineStart: `${Math.min(task.depth, 5) * 16}px`,
-            '--task-color': taskColorCss(task.color),
-          }"
-        >
-          <span class="todo-workline" aria-hidden="true" />
-          <input
-            type="checkbox"
-            :checked="task.done"
-            :disabled="!task.isWritable"
-            :title="task.isWritable ? '切换完成状态' : '此任务不可安全写入；请打开源码修复任务组或任务 ID'"
-            :aria-label="`${task.done ? '标记未完成' : '标记完成'}：${displayTaskTitle(task.title)}`"
-            @change="toggle(task)"
-          />
-          <span v-if="isDueOverdue(task)" class="todo-dot-overdue" title="截止已逾期" aria-label="截止已逾期" />
-          <span v-else-if="isScheduleLag(task)" class="todo-dot-overdue" title="执行区间已结束" aria-label="执行区间已结束" />
-          <button
-            type="button"
-            class="todo-title"
-            :title="displayTaskTitle(task.title)"
-            :aria-expanded="isExpanded(task)"
-            @click="toggleExpand(task)"
-          >{{ displayTaskTitle(task.title) }}</button>
-          <span class="todo-meta-chips" aria-hidden="false">
-            <span v-if="task.priority" class="todo-chip is-priority" :data-priority="task.priority" :title="'优先级 ' + priorityLabel(task.priority)">{{ priorityLabel(task.priority) }}</span>
-            <span v-for="tag in task.tags.slice(0, 3)" :key="tag" class="todo-chip is-tag">#{{ tag }}</span>
-            <span v-if="task.tags.length > 3" class="todo-chip is-more">+{{ task.tags.length - 3 }}</span>
-          </span>
-          <button
-            type="button"
-            class="todo-expand-btn"
-            :aria-label="`${isExpanded(task) ? '收起' : '展开'} ${displayTaskTitle(task.title)} 的详情`"
-            :title="isExpanded(task) ? '收起详情' : '展开详情'"
-            @click="toggleExpand(task)"
+        <h3 v-if="groupedList.length > 1 || scope === 'open'" class="todo-group-label">{{ group.label }} · {{ group.items.length }}</h3>
+        <ul class="todo-list">
+          <li
+            v-for="task in group.items"
+            :key="rowKey(task)"
+            class="todo-row"
+            :class="{
+              done: task.done,
+              overdue: isDueOverdue(task),
+              global: true,
+              open: isExpanded(task),
+              'todo-readonly': !task.isWritable,
+              'todo-schedule-lag': isScheduleLag(task),
+              'is-goal': isGoalTask(task),
+            }"
+            :style="{ '--task-depth': task.depth, '--task-color': task.color || 'var(--accent)' }"
           >
-            {{ isExpanded(task) ? '收起' : '···' }}
-          </button>
-        </div>
+            <div
+              class="todo-row-main"
+              :style="{
+                paddingInlineStart: `${Math.min(task.depth, 5) * 16}px`,
+                '--task-color': taskColorCss(task.color),
+              }"
+            >
+              <span class="todo-workline" aria-hidden="true" />
+              <input
+                type="checkbox"
+                :checked="task.done"
+                :disabled="!task.isWritable"
+                :title="task.isWritable ? '切换完成状态' : '此任务不可安全写入；请打开源码修复任务组或任务 ID'"
+                :aria-label="`${task.done ? '标记未完成' : '标记完成'}：${displayTaskTitle(task.title)}`"
+                @change="toggle(task)"
+              />
+              <span v-if="isDueOverdue(task)" class="todo-dot-overdue" title="截止已逾期" aria-label="截止已逾期" />
+              <span v-else-if="isScheduleLag(task)" class="todo-dot-overdue" title="执行区间已结束" aria-label="执行区间已结束" />
+              <button
+                type="button"
+                class="todo-title"
+                :title="displayTaskTitle(task.title)"
+                :aria-expanded="isExpanded(task)"
+                @click="toggleExpand(task)"
+              >{{ displayTaskTitle(task.title) }}</button>
+              <span class="todo-meta-chips" aria-hidden="false">
+                <span v-if="isGoalTask(task)" class="todo-chip is-goal" title="长期目标（标签 #目标）">目标</span>
+                <span v-if="task.priority" class="todo-chip is-priority" :data-priority="task.priority" :title="'优先级 ' + priorityLabel(task.priority)">{{ priorityLabel(task.priority) }}</span>
+                <span v-for="tag in task.tags.slice(0, 3)" :key="tag" class="todo-chip is-tag">#{{ tag }}</span>
+                <span v-if="task.tags.length > 3" class="todo-chip is-more">+{{ task.tags.length - 3 }}</span>
+              </span>
+              <button
+                type="button"
+                class="todo-expand-btn"
+                :aria-label="`${isExpanded(task) ? '收起' : '展开'} ${displayTaskTitle(task.title)} 的详情`"
+                :title="isExpanded(task) ? '收起详情' : '展开详情'"
+                @click="toggleExpand(task)"
+              >
+                {{ isExpanded(task) ? '收起' : '···' }}
+              </button>
+            </div>
 
-        <div v-if="isExpanded(task)" class="todo-row-detail">
-          <TaskInspector
-            :task="task"
-            :related-tasks="globalTasks"
-            :diagnostics="ws.taskDiagnostics"
-            :block-name="blockLabel(task)"
-            @request-patch="handleInspectorPatch"
-            @request-toggle="handleInspectorToggle"
-            @request-open-source="handleInspectorOpenSource"
-          />
-          <div class="todo-inspector-actions">
-            <button type="button" class="todo-icon-btn danger" :disabled="!task.isWritable" @click="askRemove(task)">删除任务</button>
-          </div>
-        </div>
-      </li>
-    </ul>
+            <div v-if="isExpanded(task)" class="todo-row-detail">
+              <TaskInspector
+                :task="task"
+                :related-tasks="globalTasks"
+                :diagnostics="ws.taskDiagnostics"
+                :block-name="blockLabel(task)"
+                @request-patch="handleInspectorPatch"
+                @request-toggle="handleInspectorToggle"
+                @request-open-source="handleInspectorOpenSource"
+              />
+              <div class="todo-inspector-actions">
+                <button type="button" class="todo-icon-btn danger" :disabled="!task.isWritable" @click="askRemove(task)">删除任务</button>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </section>
+    </div>
 
     <ConfirmDialog
       :open="!!pendingDelete"
