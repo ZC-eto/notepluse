@@ -362,10 +362,10 @@ function eventDateSummary(event: CalendarEvent) {
         >
           <template v-if="cell.date">
             <div class="cal-daynum">
-              {{ cell.date.getDate() }}
+              <span class="cal-daynum-text">{{ cell.date.getDate() }}</span>
               <button
                 type="button"
-                class="btn-ghost sm"
+                class="btn-ghost sm cal-day-add"
                 :disabled="!hasTargets"
                 :aria-label="`在 ${cell.key} 新建单日任务`"
                 title="新建单日任务"

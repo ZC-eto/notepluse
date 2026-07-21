@@ -34,6 +34,8 @@ const draftInput = ref<HTMLInputElement | null>(null)
 /** 有列表时：新建面板默认折叠，避免底部常驻大块 */
 const composeOpen = ref(false)
 const composeMoreOpen = ref(false)
+/** 标签/优先级/任务组筛选默认收起，有激活条件时自动展开 */
+const filtersOpen = ref(false)
 const seeding = ref(false)
 
 const globalTasks = computed<GlobalTask[]>(() => {
@@ -314,6 +316,18 @@ function toggleTag(tag: string) {
   tagFilter.value = tagFilter.value === tag ? null : tag
 }
 
+const filtersActive = computed(
+  () => Boolean(tagFilter.value || priorityFilter.value || blockFilter.value)
+)
+const showFilterPanel = computed(() => filtersOpen.value || filtersActive.value)
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (tagFilter.value) n += 1
+  if (priorityFilter.value) n += 1
+  if (blockFilter.value) n += 1
+  return n
+})
+
 async function focusComposer() {
   composeOpen.value = true
   await nextTick()
@@ -440,21 +454,24 @@ async function openSource(task: GlobalTask) {
   <div class="todo-view">
     <header class="view-toolbar" aria-label="待办工具栏">
       <div class="view-toolbar-primary">
-        <div class="todo-progress" :aria-label="`当前范围完成 ${stats.done}/${stats.total}`">
-          <div class="progress-track" aria-hidden="true">
-            <div class="progress-fill" :style="{ width: progress + '%' }" />
-          </div>
-          <span class="progress-label">{{ stats.done }}/{{ stats.total }}</span>
-        </div>
-
-        <div class="view-toolbar-cluster">
+        <div class="view-toolbar-cluster todo-scope-cluster">
           <ScopeSeg v-model="scope" :options="scopeOptions" aria-label="待办范围" />
           <HelpTip :text="scopeHelpText" label="当前范围说明" placement="left" />
           <div class="filter-seg" role="group" aria-label="完成状态筛选">
-            <button type="button" class="seg-btn" :class="{ active: filter === 'all' }" @click="filter = 'all'">全部</button>
             <button type="button" class="seg-btn" :class="{ active: filter === 'open' }" @click="filter = 'open'">未完成</button>
             <button type="button" class="seg-btn" :class="{ active: filter === 'done' }" @click="filter = 'done'">已完成</button>
+            <button type="button" class="seg-btn" :class="{ active: filter === 'all' }" @click="filter = 'all'">全部</button>
           </div>
+          <span class="todo-progress-mini" :aria-label="`当前范围完成 ${stats.done}/${stats.total}`">{{ stats.done }}/{{ stats.total }}</span>
+          <button
+            v-if="allTags.length || allBlocks.length"
+            type="button"
+            class="btn-ghost sm"
+            :class="{ active: showFilterPanel }"
+            :aria-expanded="showFilterPanel"
+            aria-controls="todo-filter-panel"
+            @click="filtersOpen = !filtersOpen"
+          >{{ filtersActive ? `筛选 · ${activeFilterCount}` : '筛选' }}</button>
           <button
             v-if="emptyKind !== 'scope' && taskBlockTargets.length"
             type="button"
@@ -463,17 +480,16 @@ async function openSource(task: GlobalTask) {
             :aria-expanded="composeOpen"
             aria-controls="todo-compose-panel"
             @click="toggleCompose"
-          >{{ composeOpen ? '收起' : '添加任务' }}</button>
+          >{{ composeOpen ? '收起' : '添加' }}</button>
         </div>
       </div>
 
       <div
-        v-if="scope === 'today' && (todaySummary.overdue || todaySummary.active || todaySummary.dueToday)"
-        class="today-summary"
+        v-if="scope === 'today' && todaySummary.overdue"
+        class="today-summary is-compact"
         aria-label="今日任务摘要"
       >
-        <span v-if="todaySummary.overdue" class="sum-chip danger">截止逾期 {{ todaySummary.overdue }}</span>
-        <span v-if="todaySummary.active" class="sum-chip">进行中 / 单日 {{ todaySummary.active }}</span>
+        <span class="sum-chip danger">截止逾期 {{ todaySummary.overdue }}</span>
         <span v-if="todaySummary.dueToday" class="sum-chip">今日截止 {{ todaySummary.dueToday }}</span>
       </div>
 
@@ -546,8 +562,13 @@ async function openSource(task: GlobalTask) {
       </section>
     </header>
 
-    <div v-if="allTags.length || allBlocks.length" class="tag-filter" aria-label="任务属性筛选">
-      <button type="button" class="tag-chip" :class="{ active: !tagFilter && !priorityFilter && !blockFilter }" @click="clearFilters">清除筛选</button>
+    <div
+      v-if="showFilterPanel && (allTags.length || allBlocks.length)"
+      id="todo-filter-panel"
+      class="tag-filter"
+      aria-label="任务属性筛选"
+    >
+      <button type="button" class="tag-chip" :class="{ active: !filtersActive }" @click="clearFilters">清除</button>
       <button v-for="tag in allTags" :key="tag" type="button" class="tag-chip" :class="{ active: tagFilter === tag }" @click="toggleTag(tag)">#{{ tag }}</button>
       <select v-model="priorityFilter" class="date-input" aria-label="按优先级筛选">
         <option :value="null">所有优先级</option>
@@ -560,7 +581,6 @@ async function openSource(task: GlobalTask) {
         <option :value="null">所有任务组</option>
         <option v-for="block in allBlocks" :key="block.key" :value="block.key">{{ block.label }}</option>
       </select>
-      <span class="tag-filter-hint">标签/优先级在任务「详情 → 编辑属性」写入 Markdown</span>
     </div>
 
     <div v-if="emptyKind === 'scope'" class="empty-state compact todo-empty">
@@ -698,8 +718,14 @@ async function openSource(task: GlobalTask) {
             <span v-for="tag in task.tags.slice(0, 3)" :key="tag" class="todo-chip is-tag">#{{ tag }}</span>
             <span v-if="task.tags.length > 3" class="todo-chip is-more">+{{ task.tags.length - 3 }}</span>
           </span>
-          <button type="button" class="todo-expand-btn" :aria-label="`${isExpanded(task) ? '收起' : '展开'} ${displayTaskTitle(task.title)} 的详情`" @click="toggleExpand(task)">
-            {{ isExpanded(task) ? '收起' : '详情' }}
+          <button
+            type="button"
+            class="todo-expand-btn"
+            :aria-label="`${isExpanded(task) ? '收起' : '展开'} ${displayTaskTitle(task.title)} 的详情`"
+            :title="isExpanded(task) ? '收起详情' : '展开详情'"
+            @click="toggleExpand(task)"
+          >
+            {{ isExpanded(task) ? '收起' : '···' }}
           </button>
         </div>
 

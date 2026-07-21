@@ -1,6 +1,6 @@
 {
   "name": "garben",
-  "version": "0.8.6",
+  "version": "0.8.7",
   "description": "稿笺（Garben）：本地 Markdown 笔记 + 任务组驱动的待办/甘特/日历",
   "type": "module",
   "scripts": {

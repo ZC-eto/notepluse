@@ -20,6 +20,8 @@ const draftTargetKey = ref('')
 const pendingDelete = ref<TaskLike | null>(null)
 const scheduleMessage = ref('')
 const selectedTaskKey = ref<string | null>(null)
+/** 有列表时折叠添加条，空态默认展开 */
+const composeOpen = ref(false)
 
 type TaskLike = Task | GlobalTask
 type GanttKind = 'range' | 'milestone'
@@ -547,12 +549,26 @@ onBeforeUnmount(() => {
         </div>
         <div class="view-toolbar-cluster">
           <ScopeSeg v-model="scope" :options="scopeOptions" aria-label="甘特范围" />
+          <button
+            v-if="hasTargets && scheduledTasks.length"
+            type="button"
+            class="btn-ghost sm"
+            :class="{ active: composeOpen }"
+            :aria-expanded="composeOpen"
+            aria-controls="gantt-compose-bar"
+            @click="composeOpen = !composeOpen"
+          >{{ composeOpen ? '收起添加' : '添加' }}</button>
         </div>
       </div>
       <p v-if="scheduleMessage" class="view-alert" role="status">{{ scheduleMessage }}</p>
     </header>
 
-    <div v-if="hasTargets" class="gantt-compose-bar" aria-label="快速添加跨日任务">
+    <div
+      v-if="hasTargets && (composeOpen || !scheduledTasks.length)"
+      id="gantt-compose-bar"
+      class="gantt-compose-bar"
+      aria-label="快速添加跨日任务"
+    >
       <input
         v-model="draftTitle"
         class="composer-input"
@@ -570,7 +586,7 @@ onBeforeUnmount(() => {
       </select>
       <button type="button" class="btn-solid" :disabled="!draftTitle.trim() || !selectedTarget" @click="quickAdd">添加</button>
     </div>
-    <p v-else-if="scheduledTasks.length" class="composer-inline-help gantt-compose-hint">
+    <p v-if="!hasTargets && scheduledTasks.length" class="composer-inline-help gantt-compose-hint">
       <HelpTip :text="ganttWriteHelpText" label="写入目标说明" />
       <span>需先有任务组</span>
     </p>

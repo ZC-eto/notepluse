@@ -2766,10 +2766,10 @@ select:focus-visible,
   place-items: center;
   width: 30px;
   height: 30px;
-  border: 1px solid color-mix(in srgb, var(--workline) 55%, var(--line));
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--line));
   border-radius: 8px;
-  background: var(--surface);
-  color: var(--workline);
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface));
+  color: var(--accent-ink, var(--accent));
   font-size: 13px;
   font-weight: 800;
   letter-spacing: 0;
@@ -3996,12 +3996,14 @@ html.mini-mode body {
   font-variant-numeric: tabular-nums;
 }
 
-.cal-daynum .btn-ghost.sm {
+.cal-daynum .btn-ghost.sm,
+.cal-daynum .cal-day-add {
   width: 22px;
   min-height: 22px;
   padding: 0;
   border-radius: 5px;
   opacity: 0;
+  pointer-events: none;
   font-size: 14px;
   line-height: 1;
   color: var(--muted);
@@ -4011,8 +4013,14 @@ html.mini-mode body {
 
 .cal-cell:hover .cal-daynum .btn-ghost.sm,
 .cal-cell.composing .cal-daynum .btn-ghost.sm,
-.cal-daynum .btn-ghost.sm:focus-visible {
+.cal-cell.today .cal-daynum .btn-ghost.sm,
+.cal-daynum .btn-ghost.sm:focus-visible,
+.cal-cell:hover .cal-daynum .cal-day-add,
+.cal-cell.composing .cal-daynum .cal-day-add,
+.cal-cell.today .cal-daynum .cal-day-add,
+.cal-daynum .cal-day-add:focus-visible {
   opacity: 1;
+  pointer-events: auto;
   border-color: var(--line);
   background: var(--surface);
 }
@@ -4836,6 +4844,40 @@ html[data-density='compact'] .md-body .task-block-boundary {
   color: var(--faint);
   line-height: 1.4;
   margin-top: 2px;
+}
+
+.todo-progress-mini {
+  font-size: 11px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.todo-scope-cluster {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.today-summary.is-compact {
+  margin-top: 6px;
+  gap: 6px;
+}
+
+.todo-list .todo-row.overdue .todo-workline {
+  background: var(--danger) !important;
+  opacity: 1;
+  width: 3px;
+}
+
+.todo-list .todo-row.overdue .todo-title {
+  font-weight: 700;
+}
+
+.top-actions .btn-ghost.sm.top-new-note {
+  min-height: 30px;
+  padding-inline: 10px;
 }
 
 /* Settings advanced */

@@ -4,7 +4,7 @@
   "title": "稿笺",
   "description": "本地 Markdown 笔记与任务：文件夹 · 待办 · 甘特 · 日历",
   "author": "ZTools Plugin",
-  "version": "0.8.6",
+  "version": "0.8.7",
   "main": "index.html",
   "preload": "preload/services.js",
   "logo": "logo.png",

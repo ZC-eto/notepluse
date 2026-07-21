@@ -54,6 +54,17 @@ const canRetrySave = computed(
   () => Boolean(ws.activePath) && (Boolean(ws.saveError) || ws.status === '保存失败' || ws.dirty)
 )
 
+/** 投影视图不堆编辑器 chrome；仅脏稿/失败时露出保存 */
+const isEditorView = computed(() => ws.view === 'editor')
+const showSaveChrome = computed(
+  () =>
+    isEditorView.value ||
+    Boolean(ws.dirty) ||
+    Boolean(ws.saveError) ||
+    ws.status === '保存失败' ||
+    ws.saving
+)
+
 const modeHelp =
   '排版：所见即所得编辑；源码：直接编辑 Markdown。Ctrl+/ 可切换模式。左侧可切换视图；点「笔记库」浏览全部笔记。Ctrl+N 新建，Ctrl+P 搜索。'
 
@@ -108,7 +119,7 @@ function onRetrySave() {
       >
         新建
       </button>
-      <div v-if="ws.view === 'editor'" class="seg editor-mode-seg" role="group" aria-label="编辑模式">
+      <div v-if="isEditorView" class="seg editor-mode-seg" role="group" aria-label="编辑模式">
         <button
           type="button"
           class="seg-btn"
@@ -132,7 +143,7 @@ function onRetrySave() {
       </div>
 
       <span
-        v-if="saveLabel"
+        v-if="showSaveChrome && saveLabel"
         class="save-pill"
         :class="saveLabel.kind"
         :title="saveLabel.detail || saveLabel.text"
@@ -151,8 +162,9 @@ function onRetrySave() {
       >
         重试
       </button>
-      <HelpTip :text="modeHelp" label="编辑器说明" />
+      <HelpTip v-if="isEditorView" :text="modeHelp" label="编辑器说明" />
       <button
+        v-if="showSaveChrome"
         type="button"
         class="btn-solid btn-save"
         :disabled="ws.saving || (!ws.dirty && !ws.saveError)"
