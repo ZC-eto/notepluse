@@ -176,9 +176,13 @@ function onOpenFolder() {
 }
 
 function onCreateInFolder(folder: string) {
+  const target = folder || ''
   closeCtx()
-  ws.setActiveFolder(folder)
-  void ws.createNote(folder)
+  ws.setActiveFolder(target)
+  // nextTick：避免与关闭菜单的 pointer 事件抢同一帧
+  void nextTick(() => {
+    void ws.createNote(target)
+  })
 }
 
 function onSelectFolder(folder: string) {
@@ -223,8 +227,11 @@ async function confirmCreateFolder() {
 }
 
 function onNewNote() {
+  const target = ws.activeFolder || ''
   closeCtx()
-  void ws.createNote(ws.activeFolder || '')
+  void nextTick(() => {
+    void ws.createNote(target)
+  })
 }
 
 function onDeleteNote(path: string) {
@@ -268,8 +275,31 @@ function visibleNotes(notes: NoteMeta[]) {
 
 function openBlankCtx(ev: MouseEvent) {
   const t = ev.target as HTMLElement | null
-  if (t?.closest?.('.note-item, .tree-row, .sidebar-chrome, .sidebar-foot, .folder-inline-create, .icon-picker-pop, button, input')) {
+  // 文件夹/笔记行有自己的菜单；chrome 与输入不弹空白菜单
+  if (
+    t?.closest?.(
+      '.tree-row.is-note, .tree-row.is-folder, .sidebar-chrome, .sidebar-foot, .folder-inline-create, .icon-picker-pop, .lib-ctx-menu, input, textarea'
+    )
+  ) {
     return
+  }
+  // 点在分组空白/空文件夹文案上：按该文件夹建
+  const groupEl = t?.closest?.('.folder-group') as HTMLElement | null
+  if (groupEl) {
+    const folder = groupEl.getAttribute('data-folder')
+    if (folder !== null) {
+      ev.preventDefault()
+      ev.stopPropagation()
+      ctx.value = {
+        kind: 'folder',
+        x: ev.clientX,
+        y: ev.clientY,
+        folder,
+        label: folder || '未分类',
+        groupKind: groupEl.getAttribute('data-kind') || 'note',
+      }
+      return
+    }
   }
   ev.preventDefault()
   ctx.value = { kind: 'blank', x: ev.clientX, y: ev.clientY }
@@ -291,13 +321,15 @@ function closeCtx() {
   ctx.value = null
 }
 
-function onGlobalPointer(ev: MouseEvent) {
+function onGlobalPointer(ev: PointerEvent) {
+  // 右键用于打开菜单，不在此处关闭
+  if (ev.button === 2) return
   const el = ev.target as HTMLElement | null
   if (iconPicker.value && !el?.closest?.('.icon-picker-pop, .tree-icon-btn')) {
     closeIconPicker()
   }
   if (!ctx.value) return
-  if (el?.closest?.('.lib-ctx-menu')) return
+  if (el?.closest?.('.lib-ctx-menu, .lib-ctx-layer')) return
   closeCtx()
 }
 
@@ -324,11 +356,12 @@ function focusSearch() {
 }
 
 onMounted(() => {
-  document.addEventListener('pointerdown', onGlobalPointer, true)
+  // 用 pointerup 关菜单：避免右键 pointerdown 与打开菜单打架
+  document.addEventListener('pointerup', onGlobalPointer, true)
   document.addEventListener('keydown', onGlobalKey, true)
 })
 onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', onGlobalPointer, true)
+  document.removeEventListener('pointerup', onGlobalPointer, true)
   document.removeEventListener('keydown', onGlobalKey, true)
 })
 </script>
@@ -414,6 +447,9 @@ onBeforeUnmount(() => {
         :key="group.folder || '__root__'"
         class="folder-group"
         :class="{ active: ws.activeFolder === group.folder }"
+        :data-folder="group.folder"
+        :data-kind="group.kind"
+        @contextmenu="openFolderCtx($event, group.folder, displayFolderLabel(group), group.kind)"
       >
         <div
           class="tree-row is-folder"
@@ -551,11 +587,17 @@ onBeforeUnmount(() => {
     </Teleport>
 
     <Teleport to="body">
-      <div v-if="ctx" class="lib-ctx-layer" @contextmenu.prevent="closeCtx">
+      <div
+        v-if="ctx"
+        class="lib-ctx-layer"
+        @contextmenu.prevent="closeCtx"
+        @pointerdown.self="closeCtx"
+      >
         <div
           class="lib-ctx-menu rail-ctx-menu"
           role="menu"
           :style="{ left: ctx.x + 'px', top: ctx.y + 'px' }"
+          @pointerdown.stop
           @click.stop
         >
           <template v-if="ctx.kind === 'blank'">
@@ -565,7 +607,13 @@ onBeforeUnmount(() => {
           <template v-else-if="ctx.kind === 'folder'">
             <button type="button" role="menuitem" @click="onCreateInFolder(ctx.folder)">在此新建笔记</button>
             <button type="button" role="menuitem" @click="beginCreateFolder(ctx.folder)">新建子文件夹</button>
-            <button type="button" role="menuitem" @click="iconPicker = { folder: ctx.folder, x: ctx.x, y: ctx.y }; closeCtx()">更换图标</button>
+            <button
+              type="button"
+              role="menuitem"
+              @click="iconPicker = { folder: ctx.folder, x: ctx.x, y: ctx.y }; closeCtx()"
+            >
+              更换图标
+            </button>
             <button type="button" role="menuitem" @click="onRenameFolder(ctx.folder)">重命名</button>
             <button type="button" role="menuitem" class="is-danger" @click="onDeleteFolder(ctx.folder)">删除</button>
           </template>

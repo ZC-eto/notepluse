@@ -7344,3 +7344,44 @@ body { background: var(--bg) !important; }
 }
 .folder-inline-create .icon-pick { display: none !important; }
 .tree-list .folder-empty { font-size: 11px; color: var(--faint); }
+
+/* Library context menu: ensure visible above shell */
+.lib-ctx-layer {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 120 !important;
+  background: transparent !important;
+}
+.lib-ctx-menu.rail-ctx-menu,
+.rail-ctx-menu.lib-ctx-menu {
+  position: fixed !important;
+  z-index: 121 !important;
+  min-width: 160px !important;
+  padding: 6px !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--line) !important;
+  background: var(--surface) !important;
+  box-shadow: var(--shadow) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+.lib-ctx-menu button,
+.rail-ctx-menu button {
+  border: 0 !important;
+  background: transparent !important;
+  text-align: left !important;
+  padding: 8px 10px !important;
+  border-radius: 6px !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  color: var(--ink) !important;
+  cursor: pointer !important;
+}
+.lib-ctx-menu button:hover,
+.rail-ctx-menu button:hover {
+  background: var(--surface-2) !important;
+}
+.lib-ctx-menu button.is-danger {
+  color: var(--danger) !important;
+}
